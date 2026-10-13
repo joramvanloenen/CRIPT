@@ -21,6 +21,7 @@ freshHero(){return{x:4.5*1.8,z:4.5*1.8,yaw:Math.PI/2,pitch:0,vx:0,vz:0,hp:100,st
 sceneTexture(asset){if(!asset)return null;if(this.images[asset.id])return this.images[asset.id];const t=new T.CanvasTexture(C.spriteCanvas(asset));t.magFilter=T.NearestFilter;t.minFilter=T.NearestFilter;t.wrapS=T.RepeatWrapping;t.wrapT=T.RepeatWrapping;t.colorSpace=T.SRGBColorSpace;this.images[asset.id]=t;return t}
 pos(room,x,z){return{x:(room.gx*9+x+.5)*1.8,z:(room.gz*9+z+.5)*1.8}}
 buildWorld(){
+ if(this.architecture)this.architecture.dispose();
  this.world.clear();
  Object.values(this.images).forEach(t=>t.dispose());
  this.images={};
