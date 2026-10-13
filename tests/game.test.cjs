@@ -68,4 +68,12 @@ C.WeaponRig.tick(game,1);assert.equal(game.attackAnim,null,'Recovery failed to f
 const pose0=C.WeaponRig.samplePose(.06,false,1);
 const pose1=C.WeaponRig.samplePose(.39,false,1);
 assert.ok(Math.abs(pose0.rz-pose1.rz)>.4,'Swing arc too small');
-console.log('PASS: runtime boot; four meshes; wall UV repeat; combat turning; windup/impact/recovery');
+const html=fs.readFileSync('index.html','utf8'),css=fs.readFileSync('style.css','utf8');
+assert.ok(html.indexOf('src="weapons.js"')<html.indexOf('src="game.js"'),'Weapon rig must load before engine');
+for(const key of ['q','e','w','a','s','d','f','attack','dodge','spell']){
+ const m=html.match(new RegExp('<button[^>]*data-touch="'+key+'"[^>]*>([\\s\\S]*?)<\\/button>'));
+ assert.ok(m&&m[1].includes('<svg'),'Touch button '+key+' must use a vector icon');
+ assert.equal(m[1].replace(/<[^>]+>/g,'').trim(),'','Touch button '+key+' must not contain selectable text');
+}
+assert.ok(css.includes('-webkit-user-select:none!important')&&css.includes('touch-action:none!important'),'Touch controls must disable text selection and long press');
+console.log('PASS: runtime boot; distinct weapons; repeating wall UVs; free combat turning; swing timing; SVG touch controls');
