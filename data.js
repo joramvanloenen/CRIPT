@@ -42,7 +42,7 @@ C.save=()=>{try{localStorage.setItem(C.SAVE_KEY,JSON.stringify(C.project));docum
 C.notice=(msg)=>{const el=document.getElementById('toast');if(!el)return;el.textContent=msg;clearTimeout(C.noticeTimer);C.noticeTimer=setTimeout(()=>el.textContent='',2800)};
 C.export=()=>{const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(C.project,null,2)],{type:'application/json'}));a.href=url;a.download='cript-world-v2.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)};
 C.import=async file=>{if(file.size>4000000)throw Error('Pack exceeds 4MB');const p=C.validate(JSON.parse(await file.text()));C.project=C.copy(p);C.save();return p};
-C.spriteCanvas=asset=>{const n=asset.width||16,c=document.createElement('canvas');c.width=c.height=n;const ctx=c.getContext('2d');ctx.clearRect(0,0,n,n);for(let i=0;i<asset.pixels.length;i++)if(asset.pixels[i]){ctx.fillStyle=asset.pixels[i];ctx.fillRect(i%n,Math.floor(i/n),1,1)}return c};
+C.spriteCanvas=asset=>{const w=asset.width||16,h=asset.height||w,c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d');ctx.clearRect(0,0,w,h);for(let i=0;i<asset.pixels.length;i++)if(asset.pixels[i]){ctx.fillStyle=asset.pixels[i];ctx.fillRect(i%w,Math.floor(i/w),1,1)}return c};
 C.wpos=(room,x,z)=>[(room.gx*C.SIZE+x-0.5)*1.8,(room.gz*C.SIZE+z-0.5)*1.8];
 C.roomAt=(x,z)=>{const gx=Math.floor(x/(C.SIZE*1.8)),gz=Math.floor(z/(C.SIZE*1.8));return C.project.rooms['room-'+(gz*4+gx)]||null};
 C.tileAt=(x,z)=>{const gx=Math.floor(x/1.8),gz=Math.floor(z/1.8);if(gx<0||gz<0||gx>=36||gz>=36)return'stone';const room=C.project.rooms['room-'+(Math.floor(gz/9)*4+Math.floor(gx/9))];return room?.tiles[(gz%9)*9+(gx%9)]||'stone'};
