@@ -48,14 +48,49 @@ class Masonry{
   this.world=world;this.project=project;this.texture=texture;this.geom=new Map();
   this.mats=new Map();this.rooms=new Map();this.count={blocks:0,arches:0,vaults:0,rubble:0,rooms:0};
   this.unit=new T.Object3D();
+  this.normalMaps=[];
   for(const [id,asset]of Object.entries(project.assets.textures)){
    const map=texture(asset);
    map.wrapS=map.wrapT=T.RepeatWrapping;
-   this.mats.set(id,new T.MeshLambertMaterial({map,color:0xffffff,side:T.FrontSide}));
+   const normalMap=this.makeNormalMap(asset);
+   this.mats.set(id,new T.MeshStandardMaterial({
+    map,normalMap,roughness:id==='moss'?.99:.91,metalness:0,color:0xffffff,
+    side:T.FrontSide,flatShading:false
+   }));
   }
   for(const [id,color]of Object.entries({mortar:0x192525,shadow:0x101d1c,trim:0x889187,ivory:0xbeb99f,soot:0x343c38,iron:0x514b42,wood:0x564b38,lichen:0x4b7561,gold:0xb59a70,glass:0x98d6b9,light:0xcddcc0,water:0x2c645d})){
    this.mats.set(id,new T.MeshLambertMaterial({color,side:T.DoubleSide}));
   }
+ }
+ makeNormalMap(asset){
+  if(!asset?.pixels||typeof document==='undefined')return null;
+  const canvas=document.createElement('canvas');
+  const ctx=canvas.getContext?.('2d');
+  if(!ctx?.createImageData||!ctx.putImageData)return null;
+  const width=asset.width||32,height=asset.height||width;
+  canvas.width=width;canvas.height=height;
+  const heights=new Float32Array(width*height);
+  for(let i=0;i<heights.length;i++){
+   const c=asset.pixels[i]||'#303030',hex=c[0]==='#'?c.slice(1):'303030';
+   const v=parseInt(hex,16)||0;
+   heights[i]=(.2126*((v>>16)&255)+.7152*((v>>8)&255)+.0722*(v&255))/255;
+  }
+  const pixels=ctx.createImageData(width,height);
+  const sample=(x,y)=>heights[((y+height)%height)*width+((x+width)%width)];
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+   const dx=(sample(x+1,y)-sample(x-1,y))*2.2;
+   const dy=(sample(x,y+1)-sample(x,y-1))*2.2;
+   const inv=1/Math.hypot(dx,dy,1),i=(y*width+x)*4;
+   pixels.data[i]=Math.round(128-dx*inv*127);
+   pixels.data[i+1]=Math.round(128+dy*inv*127);
+   pixels.data[i+2]=Math.round(128+inv*127);
+   pixels.data[i+3]=255;
+  }
+  ctx.putImageData(pixels,0,0);
+  const tex=new T.CanvasTexture(canvas);
+  tex.wrapS=tex.wrapT=T.RepeatWrapping;
+  tex.minFilter=tex.magFilter=T.NearestFilter;
+  this.normalMaps.push(tex);return tex;
  }
  geometry(w,h,d){
   const key=[w,h,d].map(v=>v.toFixed(2)).join(':');
