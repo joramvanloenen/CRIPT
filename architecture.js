@@ -29,7 +29,7 @@ function config(room){
  return{height:lim(Number(room.ceilingHeight)||preset.height,3,10),
   vault:['flat','barrel','cross','ribbed'].includes(room.vaultStyle)?room.vaultStyle:preset.vault,
   decay:lim(Number.isFinite(+room.decay)?+room.decay:preset.decay,0,1),
-  role:preset.role};
+  role:preset.role,archStyle:room.archStyle==='round'||room.archStyle==='pointed'?room.archStyle:(preset.vault==='ribbed'?'pointed':'round')};
 }
 function materialSurface(geo){
  // Author world-scale UVs per stone, even when courses use different shapes.
@@ -97,16 +97,24 @@ class Masonry{
   if(!this.geom.has(key))this.geom.set(key,materialSurface(new T.BoxGeometry(w,h,d)));
   return{key,geometry:this.geom.get(key)};
  }
- archSegment(index,segments,radius,outer,depth){
-  const key='arch'+[index,segments,radius,outer,depth].join(':');
+ archSegment(index,segments,radius,outer,depth,style='round'){
+  const key='arch'+[index,segments,radius,outer,depth,style].join(':');
   if(!this.geom.has(key)){
    // Individual wedge-shaped voussoirs converge radially on the arch.
    const start=Math.PI*index/segments,end=Math.PI*(index+1)/segments,eps=.009;
+   // A Gothic lancet consists of opposing arcs meeting at a high cusp.
+   // The outside radius preserves the proper thickness for compression stones.
+   const point=(theta,r)=>({
+    x:Math.cos(theta)*r,
+    y:(Math.sin(theta)+(style==='pointed'?.32*(1-Math.abs(Math.cos(theta))):0))*r
+   });
+   const a=point(start+eps,radius),b=point(start+eps,outer),
+         c=point(end-eps,outer),d=point(end-eps,radius);
    const shape=new T.Shape();
-   shape.moveTo(Math.cos(start+eps)*radius,Math.sin(start+eps)*radius);
-   shape.lineTo(Math.cos(start+eps)*outer,Math.sin(start+eps)*outer);
-   shape.lineTo(Math.cos(end-eps)*outer,Math.sin(end-eps)*outer);
-   shape.lineTo(Math.cos(end-eps)*radius,Math.sin(end-eps)*radius);
+   shape.moveTo(a.x,a.y);
+   shape.lineTo(b.x,b.y);
+   shape.lineTo(c.x,c.y);
+   shape.lineTo(d.x,d.y);
    shape.closePath();
    const geo=new T.ExtrudeGeometry(shape,{depth:depth,bevelEnabled:true,bevelSize:.008,bevelThickness:.008,bevelSegments:1,steps:1,curveSegments:1});
    geo.translate(0,0,-depth/2);this.geom.set(key,geo);
@@ -207,6 +215,7 @@ class Masonry{
  }
  arch(room,cx,cz,yaw=0,scale=1,base=2.04,material=null){
   const mat=material||this.palette(room),r=.87*scale,outer=1.16*scale,segments=11;
+  const style=config(room).archStyle;
   // Left and right springers rest on square piers; the key stone locks the arch.
   const side=x=>{const xx=cx+Math.cos(yaw)*x,zz=cz-Math.sin(yaw)*x;
    for(let i=0;i<5;i++){const cy=(i+.5)*base/5;
@@ -214,12 +223,12 @@ class Masonry{
   };
   side(-1.13*scale);side(1.13*scale);
   for(let i=0;i<segments;i++){
-   const a=this.archSegment(i,segments,r,outer,.49*scale);
+   const a=this.archSegment(i,segments,r,outer,.49*scale,style);
    const tint=i===Math.floor(segments/2)?new T.Color(0xb2b9aa):this.tint(room,cx+i*.13,base,cz);
    this.instance(room,mat,a.key,a.geometry,cx,base,cz,0,yaw,0,tint);this.count.arches++;
   }
   // A heavy crowned keystone visible from a distance.
-  const crown=base+outer-.025;
+  const crown=base+outer*(style==='pointed'?1.32:1)-.025;
   this.box(room,'trim',cx,crown,cz,.28*scale,.3*scale,.55*scale,yaw);
  }
  doorway(room,edge,cfg){
