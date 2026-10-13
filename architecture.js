@@ -46,7 +46,7 @@ function materialSurface(geo){
 class Masonry{
  constructor(world,project,texture){
   this.world=world;this.project=project;this.texture=texture;this.geom=new Map();
-  this.mats=new Map();this.rooms=new Map();this.count={blocks:0,arches:0,vaults:0,rubble:0,rooms:0};
+  this.mats=new Map();this.rooms=new Map();this.colliders=[];this.count={blocks:0,arches:0,vaults:0,rubble:0,rooms:0};
   this.unit=new T.Object3D();
   this.normalMaps=[];
   for(const [id,asset]of Object.entries(project.assets.textures)){
@@ -120,6 +120,16 @@ class Masonry{
    geo.translate(0,0,-depth/2);this.geom.set(key,geo);
   }
   return{key,geometry:this.geom.get(key)};
+ }
+ collider(room,x,z,w,d,yaw=0){
+  const co=Math.abs(Math.cos(yaw)),si=Math.abs(Math.sin(yaw));
+  this.colliders.push({room:room.id,x,z,hx:(w*co+d*si)/2,hz:(d*co+w*si)/2});
+ }
+ blocked(x,z,r=.28){
+  for(const c of this.colliders){
+   if(Math.abs(x-c.x)<c.hx+r&&Math.abs(z-c.z)<c.hz+r)return true;
+  }
+  return false;
  }
  roomStore(room){
   if(!this.rooms.has(room.id)){const group=new T.Group();group.name='Masonry / '+room.name;this.world.add(group);this.rooms.set(room.id,{group,buckets:new Map(),room});this.count.rooms++}
@@ -328,6 +338,7 @@ class Masonry{
    }
    place('trim',0,.33,-1.40,6.4,.22,1.15);
    place(mat,0,1.10,-2.75,2.75,1.18,1.3);
+   {const [bx,bz]=off(0,-2.75);this.collider(room,bx,bz,2.8,1.32,yaw)}
    place('ivory',0,1.76,-2.75,2.98,.16,1.5);
    for(const dx of [-2.6,2.6]){
     for(let i=0;i<4;i++){
@@ -358,6 +369,7 @@ class Masonry{
    for(const dx of [-2.65,2.65]){
     const [px,pz]=plinth(dx,-1.6,1.3,2.6,.31,mat);
     this.box(room,'trim',px,.74,pz,1.12,.44,2.38);
+    this.collider(room,px,pz,1.18,2.4,yaw);
     this.box(room,'ivory',px,1.02,pz,.48,.12,1.4);
     this.box(room,'shadow',px,2.1,pz-1.25,.9,1.7,.12);
     this.arch(room,px,pz-1.18,0,.52,2.03,mat);
@@ -367,6 +379,7 @@ class Masonry{
    for(const side of [-1,1])for(let i=0;i<3;i++){
     const [px,pz]=off(side*2.9,-2.25+i*2);
     this.box(room,mat,px,.51,pz,.95,.9,1.58);
+    this.collider(room,px,pz,.98,1.6,yaw);
     this.box(room,role==='item'?'iron':'wood',px,1.05,pz,1.07,.15,1.6);
     this.box(room,'trim',px,.17,pz,1.15,.28,1.8);
    }
