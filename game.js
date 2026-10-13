@@ -18,7 +18,7 @@ constructor(){
  this.buildWorld();this.resetActors();this.bind();this.resize();window.addEventListener('resize',()=>this.resize());requestAnimationFrame(t=>this.loop(t));
 }
 freshHero(){return{x:4.5*1.8,z:4.5*1.8,yaw:Math.PI/2,pitch:0,vx:0,vz:0,hp:100,st:100,mp:80,weapon:'rust',souls:0,kills:0,journal:false,step:null,wait:0,attack:0,dodge:0,injured:0,regen:0,safe:0,veil:0}}
-sceneTexture(asset){if(!asset)return null;if(this.images[asset.id])return this.images[asset.id];const t=new T.CanvasTexture(C.spriteCanvas(asset));t.magFilter=T.NearestFilter;t.minFilter=T.NearestFilter;t.colorSpace=T.SRGBColorSpace;this.images[asset.id]=t;return t}
+sceneTexture(asset){if(!asset)return null;if(this.images[asset.id])return this.images[asset.id];const t=new T.CanvasTexture(C.spriteCanvas(asset));t.magFilter=T.NearestFilter;t.minFilter=T.NearestFilter;t.wrapS=T.RepeatWrapping;t.wrapT=T.RepeatWrapping;t.colorSpace=T.SRGBColorSpace;this.images[asset.id]=t;return t}
 pos(room,x,z){return{x:(room.gx*9+x+.5)*1.8,z:(room.gz*9+z+.5)*1.8}}
 buildWorld(){
  this.world.clear();Object.values(this.images).forEach(t=>t.dispose());this.images={};
@@ -28,9 +28,21 @@ buildWorld(){
   if(C.project.assets.textures[id].solid){if((r.gx*9+x===0)||(r.gx*9+x===35)||(r.gz*9+z===0)||(r.gz*9+z===35)||!C.isSolid(loc.x+1.8,loc.z)||!C.isSolid(loc.x-1.8,loc.z)||!C.isSolid(loc.x,loc.z+1.8)||!C.isSolid(loc.x,loc.z-1.8))g.wall.push(loc)}
   else{g.floor.push(loc);g.roof.push(loc)}
  }}
- const box=new T.BoxGeometry(1.8,1,1.8),dummy=new T.Object3D();
+ const geometry={
+  floor:new T.BoxGeometry(1.8,.25,1.8),
+  wall:new T.BoxGeometry(1.8,3.4,1.8),
+  roof:new T.BoxGeometry(1.8,.25,1.8)
+ };
+ // Wall UVs must follow physical metres: 32x32 pixels cover about 1.8 m,
+ // so a 3.4 m high block needs ~1.89 repeats instead of one stretched image.
+ const wallUV=geometry.wall.getAttribute('uv'),normals=geometry.wall.getAttribute('normal');
+ for(let i=0;i<wallUV.count;i++){
+  if(Math.abs(normals.getY(i))<.5)wallUV.setY(i,wallUV.getY(i)*(3.4/1.8));
+ }
+ wallUV.needsUpdate=true;
+ const dummy=new T.Object3D();
  for(const [id,g]of Object.entries(groups)){const mat=new T.MeshLambertMaterial({map:this.sceneTexture(C.project.assets.textures[id])});
-  for(const part of ['floor','wall','roof']){if(!g[part].length)continue;const mesh=new T.InstancedMesh(box,mat,g[part].length);mesh.frustumCulled=false;g[part].forEach((p,i)=>{dummy.position.set(p.x,part==='floor'?-0.125:part==='roof'?3.42:1.64,p.z);dummy.scale.set(1,part==='wall'?3.4:.25,1);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix)});mesh.instanceMatrix.needsUpdate=true;this.world.add(mesh)}}
+  for(const part of ['floor','wall','roof']){if(!g[part].length)continue;const mesh=new T.InstancedMesh(geometry[part],mat,g[part].length);mesh.frustumCulled=false;g[part].forEach((p,i)=>{dummy.position.set(p.x,part==='floor'?-0.125:part==='roof'?3.42:1.64,p.z);dummy.scale.set(1,1,1);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix)});mesh.instanceMatrix.needsUpdate=true;this.world.add(mesh)}}
  // A few strongly lit volumetric-looking fog layers; distance fog always remains active.
  const mistMat=new T.MeshBasicMaterial({color:0x416a61,transparent:true,opacity:.055,side:T.DoubleSide,depthWrite:false});
  for(let i=0;i<18;i++)for(let layer=0;layer<3;layer++){const m=new T.Mesh(new T.PlaneGeometry(14,11),mistMat);m.rotation.x=-Math.PI/2;m.position.set(6+i%5*12,.045+layer*.3,7+Math.floor(i/5)*15);m.material=mistMat.clone();m.material.opacity=.05/(layer+1);this.world.add(m)}
@@ -71,13 +83,13 @@ resetActors(){
  }
 }
 makeWeapon(){
- this.weaponView.clear();const h=this.hero,w=C.project.assets.weapons[h.weapon]||C.project.assets.weapons.rust;
- const g=new T.Group(),metal=new T.MeshStandardMaterial({color:w.color,metalness:.55,roughness:.52}),handle=new T.MeshStandardMaterial({color:0x574434,roughness:1});
- const grip=new T.Mesh(new T.CylinderGeometry(.045,.05,.45,6),handle);grip.position.y=-.23;g.add(grip);
- const blade=new T.Mesh(new T.BoxGeometry(w.weight>=3?.3:.13,w.weight>=3?.77:.63,w.weight>=3?.18:.09),metal);blade.position.y=.37;g.add(blade);
- const tip=new T.Mesh(new T.ConeGeometry(w.weight>=3?.16:.09,.24,4),metal);tip.rotation.y=Math.PI/4;tip.position.y=.81;g.add(tip);
- const guard=new T.Mesh(new T.BoxGeometry(.35,.08,.11),handle);guard.position.y=.02;g.add(guard);g.scale.setScalar(.72);this.weaponView.add(g);this.weaponView.position.set(.4,-.33,-.65);$('weaponName').textContent=w.name;
+ this.weaponView.clear();
+ const def=C.project.assets.weapons[this.hero.weapon]||C.project.assets.weapons.rust;
+ this.weaponView.add(C.WeaponRig.create(def));
+ this.attackAnim=null;
+ $('weaponName').textContent=def.name;
 }
+
 bind(){
  const resume=()=>this.pause(false);$('startBtn').onclick=()=>this.start();$('retryBtn').onclick=()=>this.start();$('newBtn').onclick=()=>this.start();$('resumeBtn').onclick=resume;
  $('helpBtn').onclick=()=>$('helpDialog').showModal();$('closeHelp').onclick=$('closeHelp2').onclick=()=>$('helpDialog').close();
@@ -130,10 +142,30 @@ free(dt){const p=this.hero;const turn=(this.keys.has('e')?1:0)-(this.keys.has('q
   if(Math.hypot(gx-p.x,gz-p.z)<.62&&this.can(gx,gz,.32)){const dx=gx-p.x,dz=gz-p.z;if(this.can(p.x+dx*.25,p.z+dz*.25)){p.x+=dx*Math.min(1,dt*8);p.z+=dz*Math.min(1,dt*8)}if(Math.hypot(gx-p.x,gz-p.z)<.04){p.x=gx;p.z=gz;p.yaw=Math.round(p.yaw/(Math.PI/2))*Math.PI/2;p.vx=0;p.vz=0;p.wait=.14;p.safe=0;this.mode='grid';$('stateChip').textContent='EXPLORING';C.notice('SILENCE RETURNS')}}else p.safe=2.2
  }
 }
-strike(heavy){if(!this.running||this.paused)return;const p=this.hero,w=C.project.assets.weapons[p.weapon];if(!w||p.attack>0||p.st<w.stamina*(heavy?1.7:1))return;this.alert();p.st-=w.stamina*(heavy?1.7:1);p.regen=.6;p.attack=w.cooldown*(heavy?1.45:1);this.swing=.25;this.weaponView.rotation.z=.7;let hits=0;
- for(const e of this.enemies){if(!e.alive)continue;const d=Math.hypot(e.x-p.x,e.z-p.z),dot=((e.x-p.x)*Math.sin(p.yaw)-(e.z-p.z)*Math.cos(p.yaw))/Math.max(.001,d);
- if(d<w.reach*(heavy?1.15:1)&&dot>(heavy?.1:.38)&&this.lineOfSight(p.x,p.z,e.x,e.z)){e.hp-=w.damage*(heavy?1.85:1);e.stun=heavy?.64:.23;hits++;this.emit(e.x,1,e.z,'blood');if(e.hp<=0)this.kill(e)}}
- if(hits)C.notice('IMPACT ×'+hits);this.hud()}
+strike(heavy){
+ if(!this.running||this.paused)return;
+ const p=this.hero,w=C.project.assets.weapons[p.weapon];if(!w||p.attack>0||p.st<w.stamina*(heavy?1.7:1))return;
+ this.alert();p.st-=w.stamina*(heavy?1.7:1);p.regen=.65;
+ const duration=Math.max(.3,w.cooldown*(heavy?1.48:1));
+ p.attack=duration;
+ this.attackCount=(this.attackCount||0)+1;
+ this.attackAnim={t:0,duration,heavy:!!heavy,side:this.attackCount%2?1:-1,hit:false};
+ this.hud();
+}
+resolveStrike(heavy){
+ const p=this.hero,w=C.project.assets.weapons[p.weapon];if(!w)return;
+ let hits=0;
+ for(const e of this.enemies){
+  if(!e.alive)continue;
+  const d=Math.hypot(e.x-p.x,e.z-p.z),dot=((e.x-p.x)*Math.sin(p.yaw)-(e.z-p.z)*Math.cos(p.yaw))/Math.max(.001,d);
+  if(d<w.reach*(heavy?1.15:1)&&dot>(heavy?.10:.37)&&this.lineOfSight(p.x,p.z,e.x,e.z)){
+   e.hp-=w.damage*(heavy?1.85:1);e.stun=heavy?.68:.23;hits++;
+   this.emit(e.x,1,e.z,'blood');
+   if(e.hp<=0)this.kill(e);
+  }
+ }
+ if(hits){this.hitShake=heavy?.055:.025;if(C.audio)C.audio.effect('hit')}
+}
 kill(e){e.alive=false;this.actors.remove(e.mesh);this.hero.kills++;this.hero.souls+=e.def.reward;if(e.kind==='brute'&&this.room?.id==='room-15'){this.flags.add('bell-rung');C.notice('THE BELL KEEPER FALLS — CHAPTER COMPLETE');this.hero.hp=Math.min(100,this.hero.hp+30)}}
 spell(type){if(!this.running||this.paused)return;const p=this.hero,cost=type==='ember'?22:30;if(p.mp<cost){C.notice('NOT ENOUGH ARCANA');return}p.mp-=cost;this.alert();this.emit(p.x+Math.sin(p.yaw)*1.5,1.4,p.z-Math.cos(p.yaw)*1.5,'magic');
  if(type==='veil'){p.veil=12;if(this.room?.id==='room-9')this.flags.add('veil-clue');C.notice('VEIL SIGHT — THE INVISIBLE SPEAKS')}else{for(const e of this.enemies){if(!e.alive)continue;const d=Math.hypot(e.x-p.x,e.z-p.z),dot=((e.x-p.x)*Math.sin(p.yaw)-(e.z-p.z)*Math.cos(p.yaw))/Math.max(.001,d);if(d<6&&dot>.65&&this.lineOfSight(p.x,p.z,e.x,e.z)){e.hp-=32;e.stun=.7;this.emit(e.x,1,e.z,'flame');if(e.hp<=0)this.kill(e)}}C.notice('EMBER BURST')}
@@ -169,7 +201,7 @@ update(dt){if(!this.running||this.paused)return;const p=this.hero;this.time+=dt;
  if(this.frame%10===0)this.hud()}
 loop(now){requestAnimationFrame(t=>this.loop(t));const dt=Math.min(.04,Math.max(0,(now-this.last)/1000));this.last=now;this.frame++;this.update(dt);
  const p=this.hero;this.camera.position.set(p.x,1.62+Math.sin(this.time*9)*(p.step?.026:.01),p.z);this.camera.rotation.set(p.pitch,-p.yaw,0,'YXZ');this.lantern.position.copy(this.camera.position);this.lantern.position.y-=.15;
- this.swing=Math.max(0,(this.swing||0)-dt);this.weaponView.rotation.z+=(this.swing>0?-.38:0-this.weaponView.rotation.z)*Math.min(1,dt*13);this.weaponView.position.y=-.33+Math.sin(this.time*8)*.014;
+ C.WeaponRig.tick(this,this.paused?0:dt);this.hitShake=Math.max(0,(this.hitShake||0)-dt*.25);if(this.hitShake)this.camera.rotation.x+=(Math.random()-.5)*this.hitShake;
  this.renderer.render(this.scene,this.camera);if(this.frame%40===0)$('fps').textContent=Math.round(1/Math.max(.001,dt))+' FPS / '+(this.mode==='grid'?'GRID':'FREE')}
 resize(){const w=$('webgl').clientWidth||window.innerWidth,h=$('webgl').clientHeight||600,scale=(C.project.editor.quality==='low'?.6:C.project.editor.quality==='high'?1:.8);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();this.renderer.setSize(Math.max(320,Math.floor(w*scale)),Math.max(220,Math.floor(h*scale)),false)}
 refresh(){this.buildWorld();this.resetActors();this.checkRoom(true);this.resize()}
