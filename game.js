@@ -120,6 +120,7 @@ bind(){
  this.renderer.domElement.addEventListener('pointercancel',stopTouchLook);
  this.renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
  document.addEventListener('mousemove',e=>{if(!this.running||this.paused||document.pointerLockElement!==this.renderer.domElement)return;if(this.mode==='combat')this.hero.yaw=(this.hero.yaw+e.movementX*.0024+TAU)%TAU;this.hero.pitch=clamp(this.hero.pitch-e.movementY*.002,-1.08,1.08)});
+ const touchRoot=document.getElementById('touchpad');for(const type of ['contextmenu','selectstart','dragstart'])touchRoot.addEventListener(type,e=>e.preventDefault());
  document.querySelectorAll('[data-touch]').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();const k=b.dataset.touch;if(k==='attack')this.strike(false);else if(k==='spell')this.spell('ember');else if(k==='dodge')this.dodge();else if(k==='f')this.interact();else{if((k==='q'||k==='e')&&this.mode==='grid')this.turn(k==='q'?-1:1);this.keys.add(k);b.setPointerCapture(e.pointerId)}});b.addEventListener('pointerup',()=>this.keys.delete(b.dataset.touch));b.addEventListener('pointercancel',()=>this.keys.delete(b.dataset.touch))});
 }
 start(){this.hero=this.freshHero();this.flags.clear();this.chests.clear();this.seen.clear();this.time=0;this.bell=0;this.mode='grid';this.room=null;this.running=true;this.paused=false;this.resetActors();this.makeWeapon();$('gameOverlay').classList.add('hide');$('pausePanel').classList.add('hide');$('deathPanel').classList.add('hide');this.checkRoom(true);this.hud()}
