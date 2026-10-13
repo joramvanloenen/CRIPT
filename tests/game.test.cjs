@@ -60,6 +60,16 @@ assert.ok(C.masonryStats.arches>20,'Masonry voussoirs not built');
 assert.ok(C.masonryStats.vaults>40,'Vault ceiling geometry not built');
 assert.ok(C.masonryStats.rubble>0,'Aged rubble missing');
 assert.ok(C.Masonry.config(C.project.rooms['room-15']).height>7,'Boss chamber must have tall ceiling');
+const boss=C.project.rooms['room-15'],bossX=(boss.gx*9+4.5)*1.8,bossZ=(boss.gz*9+4.5)*1.8;
+assert.equal(C.Masonry.config(boss).archStyle,'pointed','Boss arches must have Gothic lancet profiles');
+assert.ok(game.architecture.floorHeightAt(bossX,bossZ+2.0*1.8)>0,'Raised cathedral steps must change camera height');
+assert.equal(game.architecture.floorHeightAt(bossX,bossZ-3.8*1.8),0,'Entrance route must remain level');
+assert.equal(game.architecture.blocked(bossX,bossZ-3.9*1.8),false,'Cathedral entry blocked by altar');
+assert.equal(game.architecture.blocked(bossX,bossZ+2.75*1.8),true,'Altar must have collision');
+const compact=C.project.rooms['room-9'];
+assert.equal(compact.tiles[1*9+1],'stone','Secret burial room should have thick enclosing masonry');
+assert.equal(compact.tiles[4*9+4],'floor','Secret room should retain navigable center');
+
 for(const type of ['rust','axe','cleaver','maul'])assert.ok(C.WeaponRig.create(C.project.assets.weapons[type]).children.length>=4,type+' weapon missing geometry');
 game.start();
 const startYaw=game.hero.yaw;
