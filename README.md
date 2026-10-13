@@ -15,7 +15,8 @@ CRIPТ now contains an actual 3D browser game and integrated asset editing tools
 - Three enemy archetypes with pursuit, attack/health handling, hit reactions and deaths.
 - Four weapons with different mass, damage, stamina cost, reach and timing; normal and heavy attacks.
 - Health, stamina and magic; dodge, ember spell, veil sight, loot and a hidden secret.
-- Torch lighting, distance fog, layered low-height mist, pixelated textures, floating sprites, and the first Bell Keeper encounter.
+- Torch lighting, distance fog, layered low-height mist, stone columns and capitals, pixelated textures, floating sprites, and the first Bell Keeper encounter.
+- Procedural Web Audio footsteps, combat, magic and Bell ambience with a sound toggle.
 - No map at first. Discover the cartographer's journal and view only visited rooms. Mark locations with chalk.
 
 ### The integrated World Workshop
@@ -63,6 +64,7 @@ Then open http://localhost:8080/.
 - style.css — atmospheric layouts and responsive controls
 - data.js — v2 world content, pixel assets, validation and local persistence
 - game.js — Three.js renderer, hybrid movement, combat and world interactions
+- audio.js — procedural sound, ambience and interface toggle
 - editor.js — shared workshop and pixel paint tools
 - tests/world.test.cjs — automated topology and asset consistency checks
 - .github/workflows/pages.yml — deployment from main
@@ -79,4 +81,11 @@ All user edits are stored locally in the browser under **cript.project.v2**. Exp
 5. Deeper bosses, environmental puzzles, escalating gore, spatial audio and higher-quality fog.
 6. Browser usability/performance checks, mobile optimization and user-facing content tutorials.
 
-Development plan and gameplay goals originate in the earlier CRYPTWAKE concept for the new CRIPT repository.
+## Design documents (planned feature targets)
+
+- [Gameplay and mechanics](docs/CRYPTWAKE_GAME_DESIGN.md)
+- [3D technical architecture](docs/CRYPTWAKE_TECHNICAL_ARCHITECTURE.md)
+- [Integrated editor design](docs/CRYPTWAKE_EDITOR_ARCHITECTURE.md)
+- [Milestones and acceptance gates](docs/CRYPTWAKE_DELIVERY_PLAN.md)
+
+These documents define the intended completed version. The current alpha is only the first implementation phase.
