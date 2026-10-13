@@ -63,7 +63,7 @@ class Masonry{
   }
  }
  makeNormalMap(asset){
-  if(!asset?.pixels||typeof document==='undefined')return null;
+  if(!asset?.pixels||typeof document==='undefined'||this.project.editor?.quality==='low')return null;
   const canvas=document.createElement('canvas');
   const ctx=canvas.getContext?.('2d');
   if(!ctx?.createImageData||!ctx.putImageData)return null;
@@ -436,6 +436,12 @@ class Masonry{
    store.group.userData.criptRoom=store.room.id;
   }
   return this.count;
+ }
+ dispose(){
+  for(const geometry of this.geom.values())geometry.dispose?.();
+  for(const mat of this.mats.values())mat.dispose?.();
+  for(const tex of this.normalMaps)tex.dispose?.();
+  this.geom.clear();this.mats.clear();this.rooms.clear();
  }
  build(){
   for(const room of Object.values(this.project.rooms))this.buildRoom(room);
