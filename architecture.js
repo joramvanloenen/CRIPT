@@ -125,27 +125,31 @@ class Masonry{
   const courses=Math.max(7,Math.round(height/.45)),courseH=height/courses;
   // Recessed continuous rubble core stops missing facing stones opening a hole.
   this.box(room,'mortar',fx-dx*.16,height/2,fz-dz*.16,eastWest?.13:S,height,eastWest?S:.13);
+  const patterns=[
+   [.9,.9],              // normal bonded blocks
+   [.45,.9,.45],         // central long stone / two short springers
+   [.6,.6,.6],           // one-third bond
+   [.45,.45,.9]          // alternating smaller facing stones
+  ];
   for(let row=0;row<courses;row++){
-   const y=row*courseH+courseH*.5,alternating=(row%2)*.31;
+   const y=row*courseH+courseH*.5;
+   const pattern=patterns[Math.floor(hash(x*17+row*5,z*9+row*2,room.gz*7+room.gx*3)*patterns.length)];
    let from=-S/2;
-   while(from<S/2-.025){
-    const n=hash(x*19+row*3,z*11+from*9,room.gx*7+room.gz*17);
-    const remaining=S/2-from,w=Math.min(remaining, n>.58?.86:n>.28?.6:.41);
-    if(w<.08)break;
-    const chip=hash(x*4+row*13,z*7+Math.round(from*17),room.gz*5);
+   for(let i=0;i<pattern.length;i++){
+    const width=pattern[i], n=hash(x*19+row*3,z*11+i*9,room.gx*7+room.gz*17);
+    const chip=hash(x*4+row*13,z*7+i*17,room.gz*5);
     const show=chip>decay*.085 || row===0;
     if(show){
-     const trim=.014+.012*n,depth=.19+.09*n;
-     const c=from+w/2+((row%2)?Math.min(alternating,remaining*.06):0);
-     const px=fx+(eastWest?dx*(depth-.23)*.35:c),pz=fz+(eastWest?c:dz*(depth-.23)*.35);
-     this.box(room,mat,px,y,pz,
-       eastWest?depth:Math.max(.12,w-trim),courseH-.022,eastWest?Math.max(.12,w-trim):depth,0,0,
-       this.tint(room,x+row*.3,y,z+from));
-     if(chip<decay*.17&&row>1){ // smaller broken corner fragments
-      this.box(room,'soot',px,y+courseH*.35,pz,eastWest?.03:Math.max(.09,w*.19),.027,eastWest?Math.max(.09,w*.19):.03,0,0);
+     const depth=n>.64?.31:n>.22?.27:.23;
+     const c=from+width/2,offset=depth*.08;
+     const px=fx+(eastWest?dx*offset:c),pz=fz+(eastWest?c:dz*offset);
+     const w=Math.max(.1,width-.028);
+     this.box(room,mat,px,y,pz,eastWest?depth:w,courseH-.022,eastWest?w:depth,0,0,this.tint(room,x+row*.3,y,z+from));
+     if(chip<decay*.17&&row>1){
+      this.box(room,'soot',px,y+courseH*.35,pz,eastWest?.03:.11,.027,eastWest?.11:.03);
      }
     }
-    from+=w;
+    from+=width;
    }
   }
   // Projecting corbel courses and compact buttresses receive the vault thrust.
@@ -340,7 +344,8 @@ class Masonry{
    for(let k=0;k<2+Math.floor(decay*5);k++){
     const rnd=hash(x*8+k,z*15+k,room.gx*9+room.gz);
     const xx=px+(rnd-.5)*1.15,zz=pz+(hash(x,k,z*3)-.5)*1.1;
-    const w=.12+rnd*.27,h=.06+hash(k,x,z)*.17,d=.12+hash(z,k,x)*.27;
+    const rubbleSizes=[[.17,.08,.22],[.28,.13,.26],[.38,.18,.35],[.25,.10,.44]];
+    const [w,h,d]=rubbleSizes[Math.floor(rnd*rubbleSizes.length)];
     this.box(room,rnd>.8?'trim':mat,xx,h/2+.03,zz,w,h,d,0,(rnd-.5)*.56,this.tint(room,xx,h,zz));this.count.rubble++;
    }
   }
