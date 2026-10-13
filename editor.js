@@ -51,8 +51,18 @@ renderInspector(){const a=this.asset(),body=$('inspectorBody');body.replaceChild
  $('workTitle').textContent=a.name.toUpperCase();$('modeCaption').textContent=(this.mode==='dungeon'?'ROOM GRAPH':this.mode.toUpperCase())+' / '+a.id;
  this.field(body,'ASSET NAME',a,'name');
  if(this.mode==='dungeon'){this.heading(body,'DUNGEON GRAPH','16 interconnected chambers in a four-by-four floor plan. Select a chamber to edit.');this.field(body,'ROOM TYPE',a,'category','select',['entrance','combat','tomb','trap','treasure','shrine','merchant','item','sanctuary','empty','secret','boss']);this.button(body,'✎ EDIT SELECTED CHAMBER',()=>{this.selected.room=a.id;this.setMode('room')});this.field(body,'THEME',a,'theme','select',Object.keys(C.project.assets.atmosphere));}
- if(this.mode==='room'){this.heading(body,'ROOM GEOMETRY','Paint 9×9 floors and walls. Place monsters, props and torches; the game rebuilds your layout on playtest.');
- this.field(body,'ROOM CATEGORY',a,'category','select',['entrance','combat','tomb','trap','treasure','shrine','merchant','item','sanctuary','empty','secret','boss']);this.field(body,'ATMOSPHERE',a,'theme','select',Object.keys(C.project.assets.atmosphere));this.field(body,'HINT / INSCRIPTION',a,'clue','textarea');
+ if(this.mode==='room'){this.heading(body,'ROOM CONSTRUCTION','Build like masons: floor slabs, bonded stone courses, proper door arches, piers, vaulting, then age damage. Change category to alter the chamber’s original purpose.');
+ this.field(body,'ROOM CATEGORY',a,'category','select',['entrance','combat','tomb','trap','treasure','shrine','merchant','item','sanctuary','empty','secret','boss']);
+ this.heading(body,'STRUCTURAL MASONRY','Stone courses, load-bearing piers, voussoir arches, vault ribs and historic erosion are assembled automatically.');
+ this.field(body,'CEILING HEIGHT (METRES)',a,'ceilingHeight','number');
+ this.field(body,'VAULT CONSTRUCTION',a,'vaultStyle','select',['flat','barrel','cross','ribbed']);
+ this.field(body,'STONE DECAY 0–1',a,'decay','number');
+ this.button(body,'⛏ BUILD FOR ROOM PURPOSE',()=>{
+   const preset=C.Masonry.profiles[a.category]||C.Masonry.profiles.combat;
+   this.checkpoint();a.ceilingHeight=preset.height;a.vaultStyle=preset.vault;a.decay=preset.decay;this.change();
+ });
+ this.field(body,'ATMOSPHERE',a,'theme','select',Object.keys(C.project.assets.atmosphere));
+ this.field(body,'HINT / INSCRIPTION',a,'clue','textarea');
  body.append(this.formField('PAINT MODE',this.tool,'select',v=>{this.tool=v;this.draw()},[['tile','Stone & floors'],['enemy','Place enemy'],['prop','Place prop'],['delete','Remove instance']]));
  if(this.tool==='tile')body.append(this.formField('MATERIAL',this.tile,'select',v=>{this.tile=v},Object.keys(C.project.assets.textures)));
  if(this.tool==='enemy')body.append(this.formField('ENEMY',this.actor,'select',v=>{this.actor=v},Object.keys(C.project.assets.characters)));
