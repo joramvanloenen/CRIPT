@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090f11"><title>CRIPT / Into the Crypt</title><link rel="stylesheet" href="style.css"></head>
 <body>
-<header class="top"><div class="brand"><b class="sigil">✥</b><span>CRIPT<small>THE UNDERCRYPT</small></span></div><nav><button id="playTab" class="selected">◈ EXPEDITION</button><button id="editTab">▦ WORLD WORKSHOP</button></nav><div class="topright"><span class="build">ALPHA / 0.2</span><button id="helpBtn" title="Controls">?</button></div></header>
+<header class="top"><div class="brand"><b class="sigil">✥</b><span>CRIPT<small>THE UNDERCRYPT</small></span></div><nav><button id="playTab" class="selected">◈ EXPEDITION</button><button id="editTab">▦ WORLD WORKSHOP</button></nav><div class="topright"><span class="build">ALPHA / 0.2</span><button id="soundBtn" title="Sound on/off" onclick="Cript.audio&&Cript.audio.toggle()">♫</button><button id="helpBtn" title="Controls">?</button></div></header>
 <main>
 <section id="gameView" class="view active">
 <div class="viewport" id="viewport"><div id="webgl"></div>
@@ -30,5 +30,5 @@
 </div></section>
 </main>
 <dialog id="helpDialog"><div class="dialoginner"><button id="closeHelp" class="close">✕</button><div class="eyebrow">WANDERER'S MANUAL</div><h2>READ THE STONES</h2><p>Explore in deliberate grid steps. When enemies notice you, movement becomes free-flowing until the threat passes. No separate combat arenas.</p><p><b>Exploration:</b> W/S forward/back · A/D sidestep · Q/E turn · F interact · C leave chalk mark · M journal (once found).</p><p><b>Combat:</b> WASD move freely · move the mouse to look · left-click attack · right-click heavy attack · Shift dodge · 1 fire spell · 2 reveal spell. Esc pauses.</p><p>Find the cartographer's journal, clues in the masonry, weapon upgrades, and secrets. Some doors are locked until the Bell changes the crypt.</p><button id="closeHelp2" class="primary">I UNDERSTAND</button></div></dialog>
-<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script><script src="data.js"></script><script src="game.js"></script><script src="editor.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script><script src="data.js"></script><script src="game.js"></script><script src="editor.js"></script><script src="audio.js"></script>
 </body></html>
