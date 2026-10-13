@@ -56,10 +56,11 @@ renderInspector(){const a=this.asset(),body=$('inspectorBody');body.replaceChild
  this.heading(body,'STRUCTURAL MASONRY','Stone courses, load-bearing piers, voussoir arches, vault ribs and historic erosion are assembled automatically.');
  this.field(body,'CEILING HEIGHT (METRES)',a,'ceilingHeight','number');
  this.field(body,'VAULT CONSTRUCTION',a,'vaultStyle','select',['flat','barrel','cross','ribbed']);
+ this.field(body,'DOOR ARCH PROFILE',a,'archStyle','select',['round','pointed']);
  this.field(body,'STONE DECAY 0–1',a,'decay','number');
  this.button(body,'⛏ BUILD FOR ROOM PURPOSE',()=>{
    const preset=C.Masonry.profiles[a.category]||C.Masonry.profiles.combat;
-   this.checkpoint();a.ceilingHeight=preset.height;a.vaultStyle=preset.vault;a.decay=preset.decay;this.change();
+   this.checkpoint();a.ceilingHeight=preset.height;a.vaultStyle=preset.vault;a.archStyle=preset.vault==='ribbed'?'pointed':'round';a.decay=preset.decay;this.change();
  });
  this.field(body,'ATMOSPHERE',a,'theme','select',Object.keys(C.project.assets.atmosphere));
  this.field(body,'HINT / INSCRIPTION',a,'clue','textarea');
