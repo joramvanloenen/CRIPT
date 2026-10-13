@@ -25,7 +25,7 @@ buildWorld(){
  const groups={};for(const id of Object.keys(C.project.assets.textures))groups[id]={floor:[],wall:[],roof:[]};
  for(const r of Object.values(C.project.rooms)){for(let z=0;z<9;z++)for(let x=0;x<9;x++){
   const id=r.tiles[z*9+x],loc=this.pos(r,x,z),g=groups[id];if(!g)continue;
-  if(C.project.assets.textures[id].solid){if(!C.isSolid(loc.x+1.8,loc.z)||!C.isSolid(loc.x-1.8,loc.z)||!C.isSolid(loc.x,loc.z+1.8)||!C.isSolid(loc.x,loc.z-1.8))g.wall.push(loc)}
+  if(C.project.assets.textures[id].solid){if((r.gx*9+x===0)||(r.gx*9+x===35)||(r.gz*9+z===0)||(r.gz*9+z===35)||!C.isSolid(loc.x+1.8,loc.z)||!C.isSolid(loc.x-1.8,loc.z)||!C.isSolid(loc.x,loc.z+1.8)||!C.isSolid(loc.x,loc.z-1.8))g.wall.push(loc)}
   else{g.floor.push(loc);g.roof.push(loc)}
  }}
  const box=new T.BoxGeometry(1.8,1,1.8),dummy=new T.Object3D();
