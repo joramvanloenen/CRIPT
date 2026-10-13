@@ -178,7 +178,7 @@ update(dt){if(!this.running||this.paused)return;const p=this.hero;this.time+=dt;
  const nearest=this.nearest();$('interaction').textContent=nearest?'F · '+nearest.def.name.toUpperCase():'';
  if(this.frame%10===0)this.hud()}
 loop(now){requestAnimationFrame(t=>this.loop(t));const dt=Math.min(.04,Math.max(0,(now-this.last)/1000));this.last=now;this.frame++;this.update(dt);
- const p=this.hero;this.camera.position.set(p.x,1.62+Math.sin(this.time*9)*(p.step?.026:.01),p.z);this.camera.rotation.set(p.pitch,-p.yaw,0,'YXZ');this.lantern.position.copy(this.camera.position);this.lantern.position.y-=.15;
+ const p=this.hero;const targetFloor=this.architecture?.floorHeightAt(p.x,p.z)||0;this.eyeFloor=(this.eyeFloor||0)+(targetFloor-(this.eyeFloor||0))*Math.min(1,dt*12);this.camera.position.set(p.x,1.62+this.eyeFloor+Math.sin(this.time*9)*(p.step?.026:.01),p.z);this.camera.rotation.set(p.pitch,-p.yaw,0,'YXZ');this.lantern.position.copy(this.camera.position);this.lantern.position.y-=.15;
  C.WeaponRig.tick(this,this.paused?0:dt);this.hitShake=Math.max(0,(this.hitShake||0)-dt*.25);if(this.hitShake)this.camera.rotation.x+=(Math.random()-.5)*this.hitShake;
  this.renderer.render(this.scene,this.camera);if(this.frame%40===0)$('fps').textContent=Math.round(1/Math.max(.001,dt))+' FPS / '+(this.mode==='grid'?'GRID':'FREE')}
 resize(){const w=$('webgl').clientWidth||window.innerWidth,h=$('webgl').clientHeight||600,scale=(C.project.editor.quality==='low'?.6:C.project.editor.quality==='high'?1:.8);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();this.renderer.setSize(Math.max(320,Math.floor(w*scale)),Math.max(220,Math.floor(h*scale)),false)}
