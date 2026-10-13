@@ -33,7 +33,20 @@ buildWorld(){
   for(const part of ['floor','wall','roof']){if(!g[part].length)continue;const mesh=new T.InstancedMesh(box,mat,g[part].length);mesh.frustumCulled=false;g[part].forEach((p,i)=>{dummy.position.set(p.x,part==='floor'?-0.125:part==='roof'?3.42:1.64,p.z);dummy.scale.set(1,part==='wall'?3.4:.25,1);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix)});mesh.instanceMatrix.needsUpdate=true;this.world.add(mesh)}}
  // A few strongly lit volumetric-looking fog layers; distance fog always remains active.
  const mistMat=new T.MeshBasicMaterial({color:0x416a61,transparent:true,opacity:.055,side:T.DoubleSide,depthWrite:false});
- for(let i=0;i<18;i++){const m=new T.Mesh(new T.PlaneGeometry(14,11),mistMat);m.rotation.x=-Math.PI/2;m.position.set(6+i%5*12,.045,7+Math.floor(i/5)*15);this.world.add(m)}
+ for(let i=0;i<18;i++)for(let layer=0;layer<3;layer++){const m=new T.Mesh(new T.PlaneGeometry(14,11),mistMat);m.rotation.x=-Math.PI/2;m.position.set(6+i%5*12,.045+layer*.3,7+Math.floor(i/5)*15);m.material=mistMat.clone();m.material.opacity=.05/(layer+1);this.world.add(m)}
+ // Low-poly columns and worn stone capitals give chambers recognisable silhouettes.
+ const columnMat=new T.MeshLambertMaterial({color:0x65736a}),capitalMat=new T.MeshLambertMaterial({color:0x8c8c72});
+ const bodyGeo=new T.CylinderGeometry(.32,.39,3.12,7),capitalGeo=new T.BoxGeometry(1.0,.24,1.0);
+ for(const room of Object.values(C.project.rooms)){
+  for(const [px,pz] of [[1,1],[7,1],[1,7],[7,7]]){const anchor=this.pos(room,px,pz);
+   const col=new T.Mesh(bodyGeo,columnMat);col.position.set(anchor.x,1.53,anchor.z);this.world.add(col);
+   const cap=new T.Mesh(capitalGeo,capitalMat);cap.position.set(anchor.x,3.14,anchor.z);this.world.add(cap)}
+  if(['boss','shrine','tomb','sanctuary'].includes(room.category)){
+   const mx=(room.gx*9+4.5)*1.8,mz=(room.gz*9+4.5)*1.8;
+   const platform=new T.Mesh(new T.CylinderGeometry(2.9,3.1,.3,8),capitalMat);platform.position.set(mx,.08,mz);this.world.add(platform);
+   const skylight=new T.Mesh(new T.ConeGeometry(3.5,6,12,1,true),new T.MeshBasicMaterial({color:room.category==='boss'?0x3f938b:0x8cb9a5,transparent:true,opacity:.045,depthWrite:false,side:T.DoubleSide}));
+   skylight.position.set(mx,3.25,mz);this.world.add(skylight)}
+ }
  const stone=new T.MeshLambertMaterial({color:0x95896d});
  for(const room of Object.values(C.project.rooms))for(const edge of room.doors){let x=(room.gx*9+4.5)*1.8,z=(room.gz*9+4.5)*1.8,rot=0;
   if(edge==='W'){x=(room.gx*9+.5)*1.8;rot=Math.PI/2}
