@@ -3,11 +3,11 @@
 const modes={dungeon:'rooms',room:'rooms',texture:'textures',character:'characters',prop:'props',weapon:'weapons',vfx:'vfx',encounter:'encounters',logic:'logic',atmosphere:'atmosphere'};
 const defaultInk='#75978e';
 class Editor{
-constructor(){this.mode='dungeon';this.selected={};this.tool='tile';this.tile='stone';this.actor='skeleton';this.prop='urn';this.color=defaultInk;this.painting=false;this.mirror=false;this.erase=false;this.fill=false;this.brush=1;this.undoStack=[];this.redoStack=[];this.canvas=$('editCanvas');this.ctx=this.canvas.getContext('2d',{willReadFrequently:true});this.ctx.imageSmoothingEnabled=false;this.bind();this.selectDefault();this.refresh();this.animate();}
+constructor(){this.mode='dungeon';this.selected={};this.tool='tile';this.tile='stone';this.actor='skeleton';this.prop='urn';this.color=defaultInk;this.painting=false;this.mirror=false;this.erase=false;this.fill=false;this.brush=1;this.undoStack=[];this.redoStack=[];this.canvas=$('editCanvas');this.ctx=this.canvas.getContext('2d',{willReadFrequently:true});this.ctx.imageSmoothingEnabled=false;this.bind();this.selectDefault();this.makePreview();this.refresh();this.animate();}
 selectDefault(){for(const [mode,collection]of Object.entries(modes)){const id=Object.keys(this.collection(mode))[0];if(!this.selected[mode]||!this.collection(mode)[this.selected[mode]])this.selected[mode]=id;}}
 collection(mode=this.mode){return mode==='dungeon'||mode==='room'?C.project.rooms:mode==='logic'?C.project.logic:mode==='encounter'?C.project.encounters:C.project.assets[modes[mode]]||{}}
 asset(){return this.collection()[this.selected[this.mode]]||Object.values(this.collection())[0]}
-change(){C.save();this.draw();this.renderInspector();this.assetList()}
+change(){C.save();if(['room','texture','character','prop','atmosphere'].includes(this.mode)){C.game.refresh()}if(this.mode==='weapon')C.game.makeWeapon();this.draw();this.renderInspector();this.assetList()}
 checkpoint(){this.undoStack.push(C.copy(C.project));if(this.undoStack.length>35)this.undoStack.shift();this.redoStack.length=0}
 undo(){if(!this.undoStack.length)return;this.redoStack.push(C.copy(C.project));C.project=this.undoStack.pop();C.save();this.selectDefault();this.refresh()}
 redo(){if(!this.redoStack.length)return;this.undoStack.push(C.copy(C.project));C.project=this.redoStack.pop();C.save();this.selectDefault();this.refresh()}
@@ -109,7 +109,10 @@ remove(){const a=this.asset();if(!a||['room','dungeon'].includes(this.mode)){ale
  const id=a.id,referenced=Object.values(C.project.rooms).some(r=>r.theme===id||r.tiles.includes(id)||(r.props||[]).some(p=>p.kind===id)||(r.enemies||[]).some(p=>p.kind===id));
  if(referenced){alert('This asset is used in the dungeon. Replace its references before deleting.');return}
  if(!confirm('Delete '+a.name+'?'))return;this.checkpoint();delete col[id];this.selected[this.mode]=Object.keys(col)[0];this.change();this.refresh()}
-animate(){requestAnimationFrame(()=>this.animate());if(this.mode==='vfx'&&$('editorView').classList.contains('active')&&!this.painting)this.draw()}
+makePreview(){if(!window.THREE)return;const t=document.createElement('div');t.className='live-preview';t.setAttribute('aria-label','Live 3D room preview');const title=document.createElement('div');title.textContent='◈ LIVE 3D VIEW';title.className='preview-title';t.appendChild(title);$('editorStage').appendChild(t);
+ const THREE=window.THREE;this.previewCamera=new THREE.PerspectiveCamera(74,240/150,.1,90);this.previewRender=new THREE.WebGLRenderer({antialias:false,alpha:false,powerPreference:'low-power'});this.previewRender.setPixelRatio(1);this.previewRender.setSize(240,150,false);t.appendChild(this.previewRender.domElement);this.previewFrame=0}
+preview(){if(!this.previewRender||!$('editorView').classList.contains('active'))return;const room=C.project.rooms[this.mode==='dungeon'?this.selected.dungeon:(this.selected.room||'room-0')];if(!room)return;const x=(room.gx*9+4.5)*1.8,z=(room.gz*9+4.5)*1.8;this.previewCamera.position.set(x,1.65,z);this.previewCamera.lookAt(x+4,1.65,z-4);this.previewRender.render(C.game.scene,this.previewCamera)}
+animate(){requestAnimationFrame(()=>this.animate());this.previewFrame=(this.previewFrame||0)+1;if(this.previewFrame%14===0)this.preview();if(this.mode==='vfx'&&$('editorView').classList.contains('active')&&!this.painting)this.draw()}
 }
 C.editor=new Editor();
 })();
