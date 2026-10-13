@@ -1,0 +1,20 @@
+name: CRIPT Checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check syntax
+        run: |
+          node --check data.js
+          node --check game.js
+          node --check editor.js
+      - name: Check content
+        run: node tests/world.test.cjs
