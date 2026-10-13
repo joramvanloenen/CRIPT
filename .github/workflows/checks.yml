@@ -19,5 +19,6 @@ jobs:
           node --check editor.js
           node --check audio.js
       - name: Check content
-        run: node tests/world.test.cjs
+        run: |
+          node tests/world.test.cjs
           node tests/game.test.cjs
