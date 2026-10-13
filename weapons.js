@@ -5,7 +5,7 @@ const C=window.Cript,THREE=window.THREE;
 if(!C||!THREE)return;
 const T=THREE,lerp=(a,b,t)=>a+(b-a)*t,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const smooth=t=>{t=clamp(t,0,1);return t*t*(3-2*t)};
-function metal(hex,rough=.55){return new T.MeshStandardMaterial({color:hex,metalness:.65,roughness:rough,flatShading:true})}
+function metal(hex,rough=.55){return new T.MeshStandardMaterial({color:hex,metalness:.38,roughness:rough,flatShading:true})}
 function wood(hex){return new T.MeshStandardMaterial({color:hex,roughness:1,flatShading:true})}
 function addBox(g,mat,x,y,z,w,h,d,rotation=0){
  const m=new T.Mesh(new T.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.rotation.z=rotation;g.add(m);return m;
