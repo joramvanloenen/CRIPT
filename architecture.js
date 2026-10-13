@@ -292,36 +292,58 @@ class Masonry{
  }
  purpose(room,cfg){
   const role=room.category,mat=this.palette(room),[x,z]=this.xz(room,4,4);
-  const off=(dx,dz)=>[x+dx*S,z+dz*S];
-  const plinth=(dx,dz,w,d,h=.4,finish=mat)=>{const [px,pz]=off(dx,dz);this.box(room,finish,px,h/2,pz,w,h,d);this.box(room,'trim',px,h+.08,pz,w+.18,.16,d+.18);return[px,pz]};
+  // The ceremonial end of a chamber must face a solid structural wall,
+  // never the route by which workers, mourners or the player entered.
+  const backWall=['N','S','E','W'].find(side=>!room.doors.includes(side))||'N';
+  const angle=backWall==='S'?Math.PI:backWall==='E'?Math.PI/2:backWall==='W'?-Math.PI/2:0;
+  const cs=Math.cos(angle),sn=Math.sin(angle),yaw=-angle;
+  const off=(dx,dz)=>[x+(dx*cs-dz*sn)*S,z+(dx*sn+dz*cs)*S];
+  const place=(material,dx,y,dz,w,h,d)=>{const [px,pz]=off(dx,dz);this.box(room,material,px,y,pz,w,h,d,yaw);return[px,pz]};
+  const plinth=(dx,dz,w,d,h=.4,finish=mat)=>{const [px,pz]=off(dx,dz);this.box(room,finish,px,h/2,pz,w,h,d,yaw);this.box(room,'trim',px,h+.08,pz,w+.18,.16,d+.18,yaw);return[px,pz]};
   if(role==='entrance'){
    // A gatehouse has a broad axial vestibule, paired plinths and relief plaques.
-   for(const dx of [-3,3]){const [px,pz]=plinth(dx,-1.65,1.38,1.1,.5);this.box(room,mat,px,1.35,pz,.83,1.5,.82);this.box(room,'trim',px,2.2,pz,1.15,.22,1.12)}
-   this.arch(room,x,z-2.5*S,0,1.2,2.2);
+   for(const dx of [-3,3]){
+    plinth(dx,-1.65,1.38,1.1,.5);
+    place(mat,dx,1.35,-1.65,.83,1.5,.82);
+    place('trim',dx,2.2,-1.65,1.15,.22,1.12);
+   }
+   const [px,pz]=off(0,-2.5);this.arch(room,px,pz,yaw,1.2,2.2);
   }else if(role==='shrine'||role==='boss'){
-   // Raised apse, flanking choir steps, altar and sanctuary window.
-   const [ax,az]=plinth(0,-2.75,6.2,2.1,.42,'trim');
-   this.box(room,'trim',ax,.33,az+1.35*S,6.4,.22,1.15);
-   this.box(room,mat,ax,1.1,az,2.75,1.18,1.3);
-   this.box(room,'ivory',ax,1.76,az,2.98,.16,1.5);
+   // The stone staircase climbs to a raised sanctuary; landings and steps
+   // are separate courses, a practical solution for a high altar floor.
+   plinth(0,-2.75,6.2,2.1,.42,'trim');
+   for(let i=0;i<5;i++){
+    const elevation=(i+1)*.07;
+    place('trim',0,elevation/2+.01,-.87-i*.34,4.45,elevation,.4);
+    place(mat,0,elevation+.025,-.87-i*.34,4.33,.04,.37);
+   }
+   place('trim',0,.33,-1.40,6.4,.22,1.15);
+   place(mat,0,1.10,-2.75,2.75,1.18,1.3);
+   place('ivory',0,1.76,-2.75,2.98,.16,1.5);
    for(const dx of [-2.6,2.6]){
-    for(let i=0;i<4;i++){const [px,pz]=off(dx,-2.2+i*.85);
-     this.box(room,'trim',px,.24,pz,.72,.48,.83);
-     this.box(room,'wood',px,.69,pz,.7,.13,.76);
+    for(let i=0;i<4;i++){
+     const dz=-2.2+i*.85;
+     place('trim',dx,.24,dz,.72,.48,.83);
+     place('wood',dx,.69,dz,.7,.13,.76);
     }
    }
-   // The luminous clerestory is high enough to read from the room entrance.
-   for(let j=0;j<5;j++){const px=ax+(j-2)*.54;
-    this.box(room,'shadow',px,cfg.height*.70,az-1.1,.36,2.35,.09);
-    this.box(room,'glass',px,cfg.height*.70,az-.99,.26,2.0,.045);
-    this.box(room,'ivory',px,cfg.height*.70,az-.91,.047,2.05,.065);
+   // High cinquefoil clerestory: narrow glazed lights with stone mullions,
+   // all within a reinforced rectangular surround.
+   for(let j=0;j<5;j++){
+    const dx=(j-2)*.30;
+    place('shadow',dx,cfg.height*.70,-3.40,.36,2.35,.09);
+    place('glass',dx,cfg.height*.70,-3.34,.26,2.0,.047);
+    place('ivory',dx,cfg.height*.70,-3.30,.047,2.05,.065);
    }
+   for(const dx of [-.94,.94]){
+    place('ivory',dx,cfg.height*.7,-3.30,.09,2.6,.20);
+   }
+   place('ivory',0,cfg.height*.7+1.23,-3.29,2.1,.21,.22);
    if(role==='boss'){
-    for(const xx of [-1.9,1.9])this.box(room,'trim',ax+xx,3.5,az,.73,3.5,.75);
-    this.box(room,'gold',ax,cfg.height*.56,az-.85,.46,.52,.20);
+    // Monumental engaged piers and a bell-wheel relief over the altar.
+    for(const dx of [-1.9,1.9])place('trim',dx,3.5,-2.75,.73,3.5,.75);
+    place('gold',0,cfg.height*.56,-3.15,.46,.52,.20);
    }
-   // Colored, localised shaft, made of back-to-back translucent cones (gameplay unaffected).
-   if(!this.shas){this.shas=true}
   }else if(role==='tomb'||role==='secret'){
    // Burial wall: two side sarcophagi, sunken stone niches, memorial slabs.
    for(const dx of [-2.65,2.65]){
