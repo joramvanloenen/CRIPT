@@ -465,6 +465,21 @@ class Masonry{
   for(const tex of this.normalMaps)tex.dispose?.();
   this.geom.clear();this.mats.clear();this.rooms.clear();
  }
+ floorHeightAt(x,z){
+  const gx=Math.floor(x/(9*S)),gz=Math.floor(z/(9*S));
+  if(gx<0||gz<0||gx>3||gz>3)return 0;
+  const room=this.project.rooms['room-'+(gz*4+gx)];
+  if(!room||!['shrine','boss'].includes(room.category))return 0;
+  const wall=['N','S','E','W'].find(side=>!room.doors.includes(side))||'N';
+  const angle=wall==='S'?Math.PI:wall==='E'?Math.PI/2:wall==='W'?-Math.PI/2:0;
+  const cs=Math.cos(angle),sn=Math.sin(angle);
+  const cx=(room.gx*9+4.5)*S,cz=(room.gz*9+4.5)*S;
+  const dx=(x-cx)/S,dz=(z-cz)/S;
+  const localX=dx*cs+dz*sn,localZ=-dx*sn+dz*cs;
+  if(Math.abs(localX)>1.23||localZ>-.65||localZ< -3.5)return 0;
+  if(localZ< -2.35)return .42;
+  return Math.min(.35,Math.max(0,Math.ceil((-localZ-.65)/.34)*.07));
+ }
  build(){
   for(const room of Object.values(this.project.rooms))this.buildRoom(room);
   return this.finish();
