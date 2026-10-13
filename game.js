@@ -21,53 +21,29 @@ freshHero(){return{x:4.5*1.8,z:4.5*1.8,yaw:Math.PI/2,pitch:0,vx:0,vz:0,hp:100,st
 sceneTexture(asset){if(!asset)return null;if(this.images[asset.id])return this.images[asset.id];const t=new T.CanvasTexture(C.spriteCanvas(asset));t.magFilter=T.NearestFilter;t.minFilter=T.NearestFilter;t.wrapS=T.RepeatWrapping;t.wrapT=T.RepeatWrapping;t.colorSpace=T.SRGBColorSpace;this.images[asset.id]=t;return t}
 pos(room,x,z){return{x:(room.gx*9+x+.5)*1.8,z:(room.gz*9+z+.5)*1.8}}
 buildWorld(){
- this.world.clear();Object.values(this.images).forEach(t=>t.dispose());this.images={};
- const groups={};for(const id of Object.keys(C.project.assets.textures))groups[id]={floor:[],wall:[],roof:[]};
- for(const r of Object.values(C.project.rooms)){for(let z=0;z<9;z++)for(let x=0;x<9;x++){
-  const id=r.tiles[z*9+x],loc=this.pos(r,x,z),g=groups[id];if(!g)continue;
-  if(C.project.assets.textures[id].solid){if((r.gx*9+x===0)||(r.gx*9+x===35)||(r.gz*9+z===0)||(r.gz*9+z===35)||!C.isSolid(loc.x+1.8,loc.z)||!C.isSolid(loc.x-1.8,loc.z)||!C.isSolid(loc.x,loc.z+1.8)||!C.isSolid(loc.x,loc.z-1.8))g.wall.push(loc)}
-  else{g.floor.push(loc);g.roof.push(loc)}
- }}
- const geometry={
-  floor:new T.BoxGeometry(1.8,.25,1.8),
-  wall:new T.BoxGeometry(1.8,3.4,1.8),
-  roof:new T.BoxGeometry(1.8,.25,1.8)
- };
- // Wall UVs must follow physical metres: 32x32 pixels cover about 1.8 m,
- // so a 3.4 m high block needs ~1.89 repeats instead of one stretched image.
- const wallUV=geometry.wall.getAttribute('uv'),normals=geometry.wall.getAttribute('normal');
- for(let i=0;i<wallUV.count;i++){
-  if(Math.abs(normals.getY(i))<.5)wallUV.setY(i,wallUV.getY(i)*(3.4/1.8));
- }
- wallUV.needsUpdate=true;
- const dummy=new T.Object3D();
- for(const [id,g]of Object.entries(groups)){const mat=new T.MeshLambertMaterial({map:this.sceneTexture(C.project.assets.textures[id])});
-  for(const part of ['floor','wall','roof']){if(!g[part].length)continue;const mesh=new T.InstancedMesh(geometry[part],mat,g[part].length);mesh.frustumCulled=false;g[part].forEach((p,i)=>{dummy.position.set(p.x,part==='floor'?-0.125:part==='roof'?3.42:1.64,p.z);dummy.scale.set(1,1,1);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix)});mesh.instanceMatrix.needsUpdate=true;this.world.add(mesh)}}
- // A few strongly lit volumetric-looking fog layers; distance fog always remains active.
- const mistMat=new T.MeshBasicMaterial({color:0x416a61,transparent:true,opacity:.055,side:T.DoubleSide,depthWrite:false});
- for(let i=0;i<18;i++)for(let layer=0;layer<3;layer++){const m=new T.Mesh(new T.PlaneGeometry(14,11),mistMat);m.rotation.x=-Math.PI/2;m.position.set(6+i%5*12,.045+layer*.3,7+Math.floor(i/5)*15);m.material=mistMat.clone();m.material.opacity=.05/(layer+1);this.world.add(m)}
- // Low-poly columns and worn stone capitals give chambers recognisable silhouettes.
- const columnMat=new T.MeshLambertMaterial({color:0x65736a}),capitalMat=new T.MeshLambertMaterial({color:0x8c8c72});
- const bodyGeo=new T.CylinderGeometry(.32,.39,3.12,7),capitalGeo=new T.BoxGeometry(1.0,.24,1.0);
+ this.world.clear();
+ Object.values(this.images).forEach(t=>t.dispose());
+ this.images={};
+ this.architecture=C.Masonry.build(this.world,C.project,asset=>this.sceneTexture(asset));
+ // Tall chapels and the ruined bell hall receive pale high-window shafts.
  for(const room of Object.values(C.project.rooms)){
-  for(const [px,pz] of [[1,1],[7,1],[1,7],[7,7]]){const anchor=this.pos(room,px,pz);
-   const col=new T.Mesh(bodyGeo,columnMat);col.position.set(anchor.x,1.53,anchor.z);this.world.add(col);
-   const cap=new T.Mesh(capitalGeo,capitalMat);cap.position.set(anchor.x,3.14,anchor.z);this.world.add(cap)}
-  if(['boss','shrine','tomb','sanctuary'].includes(room.category)){
-   const mx=(room.gx*9+4.5)*1.8,mz=(room.gz*9+4.5)*1.8;
-   const platform=new T.Mesh(new T.CylinderGeometry(2.9,3.1,.3,8),capitalMat);platform.position.set(mx,.08,mz);this.world.add(platform);
-   const skylight=new T.Mesh(new T.ConeGeometry(3.5,6,12,1,true),new T.MeshBasicMaterial({color:room.category==='boss'?0x3f938b:0x8cb9a5,transparent:true,opacity:.045,depthWrite:false,side:T.DoubleSide}));
-   skylight.position.set(mx,3.25,mz);this.world.add(skylight)}
- }
- const stone=new T.MeshLambertMaterial({color:0x95896d});
- for(const room of Object.values(C.project.rooms))for(const edge of room.doors){let x=(room.gx*9+4.5)*1.8,z=(room.gz*9+4.5)*1.8,rot=0;
-  if(edge==='W'){x=(room.gx*9+.5)*1.8;rot=Math.PI/2}
-  if(edge==='E'){x=(room.gx*9+8.5)*1.8;rot=Math.PI/2}
-  if(edge==='N')z=(room.gz*9+.5)*1.8;
-  if(edge==='S')z=(room.gz*9+8.5)*1.8;
-  const arch=new T.Mesh(new T.BoxGeometry(2.1,.25,.4),stone);arch.rotation.y=rot;arch.position.set(x,2.85,z);this.world.add(arch);
+  if(!['boss','shrine','entrance'].includes(room.category))continue;
+  const cfg=C.Masonry.config(room);
+  const x=(room.gx*9+4.5)*1.8,z=(room.gz*9+2.25)*1.8;
+  const h=Math.max(2.5,cfg.height-1.15);
+  const cone=new T.Mesh(new T.ConeGeometry(room.category==='boss'?3.3:2.1,h,12,1,true),
+   new T.MeshBasicMaterial({color:room.theme==='sand'?0xffd2a0:0x97dad2,
+    transparent:true,opacity:room.category==='boss'?.074:.037,depthWrite:false,side:T.DoubleSide}));
+  cone.position.set(x,h/2+.65,z);
+  this.world.add(cone);
+  if(room.category==='boss'||room.category==='shrine'){
+   const glow=new T.PointLight(room.theme==='sand'?0xf2cb91:0x93c9ba,room.category==='boss'?2.1:1.15,14,2);
+   glow.position.set(x,cfg.height-.8,z);
+   this.world.add(glow);
+  }
  }
 }
+
 resetActors(){
  this.actors.clear();this.torches=[];this.enemies=[];this.props=[];this.effects=[];this.marks=[];
  for(const room of Object.values(C.project.rooms)){
@@ -192,7 +168,7 @@ chalk(){if(!this.running||this.paused)return;const mesh=new T.Mesh(new T.BoxGeom
 map(){if(!this.hero.journal){C.notice('NO MAP — FIND THE CARTOGRAPHER JOURNAL');return}this.paused=true;$('mapPanel').classList.remove('hide');const ctx=$('mapCanvas').getContext('2d');ctx.fillStyle='#131e1b';ctx.fillRect(0,0,400,320);for(const r of Object.values(C.project.rooms)){if(!this.seen.has(r.id))continue;const x=30+r.gx*87,y=15+r.gz*72;ctx.fillStyle=r===this.room?'#a08a56':'#395e57';ctx.fillRect(x,y,75,58);ctx.strokeStyle='#b4a179';ctx.strokeRect(x,y,75,58);ctx.fillStyle='#e6d9af';ctx.font='10px monospace';ctx.fillText(r.name.slice(0,12),x+3,y+30)}}
 hud(){$('hpValue').textContent=Math.ceil(this.hero.hp);$('stValue').textContent=Math.ceil(this.hero.st);$('mpValue').textContent=Math.ceil(this.hero.mp);$('hpFill').style.width=this.hero.hp+'%';$('stFill').style.width=this.hero.st+'%';$('mpFill').style.width=this.hero.mp/80*100+'%'}
 update(dt){if(!this.running||this.paused)return;const p=this.hero;this.time+=dt;this.bell+=dt;p.attack=Math.max(0,p.attack-dt);p.injured=Math.max(0,p.injured-dt);p.dodge=Math.max(0,p.dodge-dt);p.regen=Math.max(0,p.regen-dt);p.veil=Math.max(0,p.veil-dt);p.st=Math.min(100,p.st+dt*(p.regen>0?8:27));p.mp=Math.min(80,p.mp+dt*2.8);
- if(this.mode==='grid')this.grid(dt);else this.free(dt);this.checkRoom();this.updateEnemies(dt);
+ if(this.mode==='grid')this.grid(dt);else this.free(dt);this.checkRoom();this.updateEnemies(dt);if(this.frame%15===0&&this.architecture){for(const store of this.architecture.rooms.values()){const room=store.room,x=(room.gx*9+4.5)*1.8,z=(room.gz*9+4.5)*1.8;store.group.visible=Math.hypot(x-p.x,z-p.z)<35;}}
  if(this.bell>(C.project.settings.bellPeriod||100)){this.bell=0;C.notice('THE DISTANT BELL TOLLS');p.mp=Math.min(80,p.mp+12)}
  for(const e of this.effects){e.life-=dt;e.vy-=e.gravity*dt;e.mesh.position.x+=e.vx*dt;e.mesh.position.y+=e.vy*dt;e.mesh.position.z+=e.vz*dt;e.mesh.lookAt(this.camera.position);e.mesh.scale.setScalar(Math.max(.01,e.life/e.max))}
  this.effects=this.effects.filter(e=>{if(e.life>0)return true;this.actors.remove(e.mesh);return false});
