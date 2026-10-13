@@ -1,0 +1,463 @@
+{
+  "version": 2,
+  "projectId": "cryptwake-forgotten-entrance",
+  "name": "The Forgotten Entrance — editor schema example",
+  "manifest": {
+    "engine": "cryptwake",
+    "minEngineVersion": "0.2.0",
+    "description": "DESIGN EXAMPLE ONLY: aspirational asset graph schema, not currently importable into the CRIPT alpha workshop.",
+    "cellSize": 1.8,
+    "floorHeight": 3.2,
+    "startingChapterId": "chapter-crypt"
+  },
+  "assets": {
+    "textures": {
+      "tex-limestone": {
+        "id": "tex-limestone",
+        "name": "Crypt Limestone",
+        "width": 16,
+        "height": 16,
+        "palette": {
+          "s": "#536c68",
+          "d": "#293c3d",
+          "h": "#73918a"
+        },
+        "rows": [
+          "ssssssssssssssss",
+          "ssssssdsssssssss",
+          "dddddddddddddddd",
+          "sssssssssssssshs",
+          "sssdssssssssssss",
+          "ssssssssshssssss",
+          "dddddddddddddddd",
+          "ssssssssssssssss",
+          "sssssdssssshssss",
+          "ssssssssssssssss",
+          "dddddddddddddddd",
+          "ssssssssssssssss",
+          "shssssssssssssss",
+          "sssssssdssssssss",
+          "dddddddddddddddd",
+          "ssssssssssssssss"
+        ],
+        "alpha": false
+      }
+    },
+    "materials": {
+      "mat-limestone": {
+        "id": "mat-limestone",
+        "name": "Carved limestone",
+        "albedoTextureId": "tex-limestone",
+        "pixelated": true,
+        "roughness": 0.94,
+        "tileWorldSize": 1.8
+      }
+    },
+    "meshes": {
+      "mesh-urn": {
+        "id": "mesh-urn",
+        "name": "Old Urn",
+        "generator": "primitive-stack",
+        "parts": [
+          {
+            "shape": "cylinder",
+            "radiusTop": 0.35,
+            "radiusBottom": 0.25,
+            "height": 0.65,
+            "radialSegments": 6,
+            "materialId": "mat-limestone",
+            "offset": [
+              0,
+              0.32,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    "characters": {
+      "enemy-bone-sentry": {
+        "id": "enemy-bone-sentry",
+        "name": "Bone Sentry",
+        "model": {
+          "kind": "placeholder-billboard",
+          "spriteTextureId": "tex-limestone"
+        },
+        "health": 40,
+        "poise": 24,
+        "movementSpeed": 2.8,
+        "lootTableId": null,
+        "ai": {
+          "archetype": "chase-melee",
+          "visionRange": 7,
+          "hearingRange": 9,
+          "canFollowThroughDoors": true
+        },
+        "attacks": [
+          {
+            "id": "attack-sentry",
+            "name": "Clumsy Slash",
+            "damage": 9,
+            "windupMs": 470,
+            "activeMs": 140,
+            "recoveryMs": 630,
+            "reach": 1.25
+          }
+        ]
+      }
+    },
+    "props": {
+      "prop-urn": {
+        "id": "prop-urn",
+        "name": "Funerary Urn",
+        "meshId": "mesh-urn",
+        "states": [
+          "intact",
+          "broken"
+        ],
+        "initialState": "intact",
+        "collider": {
+          "type": "cylinder",
+          "radius": 0.3,
+          "height": 0.7
+        },
+        "health": 12,
+        "breakEffectId": "vfx-dust"
+      },
+      "prop-crack": {
+        "id": "prop-crack",
+        "name": "False Mortar",
+        "meshId": null,
+        "states": [
+          "hidden",
+          "revealed"
+        ],
+        "initialState": "hidden",
+        "interactLabel": "Inspect strange mortar",
+        "interactionGraphId": "logic-secret-wall"
+      }
+    },
+    "weapons": {
+      "weapon-rustblade": {
+        "id": "weapon-rustblade",
+        "name": "Rust Blade",
+        "tier": 1,
+        "massClass": "light",
+        "damage": 18,
+        "damageType": "slash",
+        "staminaCost": 13,
+        "reach": 1.45,
+        "windupMs": 170,
+        "activeMs": 150,
+        "recoveryMs": 210
+      }
+    },
+    "spells": {
+      "spell-veil": {
+        "id": "spell-veil",
+        "name": "Veil Sight",
+        "school": "veil",
+        "magicCost": 20,
+        "castMs": 400,
+        "effectGraphId": null
+      }
+    },
+    "vfx": {
+      "vfx-dust": {
+        "id": "vfx-dust",
+        "name": "Stone Dust",
+        "emitters": [
+          {
+            "shape": "cone",
+            "count": 24,
+            "lifeRange": [
+              0.25,
+              0.7
+            ],
+            "speedRange": [
+              0.3,
+              1.3
+            ],
+            "tint": "#9faaa0"
+          }
+        ],
+        "maxParticles": 48
+      }
+    },
+    "sounds": {},
+    "roomPrefabs": {
+      "room-entrance": {
+        "id": "room-entrance",
+        "name": "Forgotten Entrance",
+        "category": "sanctuary",
+        "width": 4,
+        "depth": 4,
+        "floorLevel": 0,
+        "defaultFloorMaterialId": "mat-limestone",
+        "defaultWallMaterialId": "mat-limestone",
+        "ceilingHeight": 3.2,
+        "perimeterWalls": true,
+        "doorSockets": [
+          {
+            "id": "socket-east",
+            "edge": "east",
+            "index": 1,
+            "width": 1,
+            "level": 0
+          }
+        ],
+        "placements": [
+          {
+            "id": "inst-urn",
+            "assetType": "prop",
+            "assetId": "prop-urn",
+            "cell": [
+              2,
+              1
+            ],
+            "positionOffset": [
+              0,
+              0,
+              0
+            ],
+            "yawDegrees": 0
+          }
+        ],
+        "playerSpawns": [
+          {
+            "id": "start",
+            "cell": [
+              1,
+              1
+            ],
+            "yawDegrees": 90
+          }
+        ],
+        "atmosphereId": "atm-crypt"
+      },
+      "room-ossuary": {
+        "id": "room-ossuary",
+        "name": "Stone Ossuary",
+        "category": "combat",
+        "width": 4,
+        "depth": 4,
+        "floorLevel": 0,
+        "defaultFloorMaterialId": "mat-limestone",
+        "defaultWallMaterialId": "mat-limestone",
+        "ceilingHeight": 3.2,
+        "perimeterWalls": true,
+        "doorSockets": [
+          {
+            "id": "socket-west",
+            "edge": "west",
+            "index": 1,
+            "width": 1,
+            "level": 0
+          },
+          {
+            "id": "socket-north-secret",
+            "edge": "north",
+            "index": 1,
+            "width": 1,
+            "level": 0
+          }
+        ],
+        "placements": [
+          {
+            "id": "inst-crack",
+            "assetType": "prop",
+            "assetId": "prop-crack",
+            "cell": [
+              1,
+              0
+            ],
+            "positionOffset": [
+              0,
+              1.1,
+              0
+            ],
+            "yawDegrees": 180
+          }
+        ],
+        "encounterIds": [
+          "enc-ossuary"
+        ],
+        "atmosphereId": "atm-crypt"
+      },
+      "room-secret": {
+        "id": "room-secret",
+        "name": "False Burial",
+        "category": "secret",
+        "width": 3,
+        "depth": 3,
+        "floorLevel": 0,
+        "defaultFloorMaterialId": "mat-limestone",
+        "defaultWallMaterialId": "mat-limestone",
+        "ceilingHeight": 2.8,
+        "perimeterWalls": true,
+        "doorSockets": [
+          {
+            "id": "socket-south",
+            "edge": "south",
+            "index": 1,
+            "width": 1,
+            "level": 0
+          }
+        ],
+        "placements": [],
+        "atmosphereId": "atm-crypt"
+      }
+    },
+    "encounters": {
+      "enc-ossuary": {
+        "id": "enc-ossuary",
+        "name": "Guard the Tomb",
+        "on": "OnEnterRoom",
+        "spawns": [
+          {
+            "characterId": "enemy-bone-sentry",
+            "count": 1,
+            "cell": [
+              2,
+              2
+            ]
+          }
+        ],
+        "sealDoors": false
+      }
+    },
+    "logicGraphs": {
+      "logic-secret-wall": {
+        "id": "logic-secret-wall",
+        "name": "Loose Mortar Reveal",
+        "nodes": [
+          {
+            "id": "n1",
+            "type": "OnInteract",
+            "targetInstanceId": "inst-crack"
+          },
+          {
+            "id": "n2",
+            "type": "SetDoorState",
+            "edgeId": "edge-secret",
+            "state": "open"
+          },
+          {
+            "id": "n3",
+            "type": "SetFlag",
+            "flagId": "secret-false-burial",
+            "value": true
+          }
+        ],
+        "edges": [
+          {
+            "from": "n1",
+            "to": "n2"
+          },
+          {
+            "from": "n2",
+            "to": "n3"
+          }
+        ],
+        "maxSteps": 16
+      }
+    },
+    "atmospheres": {
+      "atm-crypt": {
+        "id": "atm-crypt",
+        "name": "Teal Crypt",
+        "ambientColor": "#13292a",
+        "heightFog": {
+          "color": "#1c625f",
+          "density": 0.085,
+          "heightFalloff": 0.6,
+          "baseY": 0.25
+        },
+        "distanceFog": {
+          "color": "#102526",
+          "density": 0.032
+        },
+        "volumetricQuality": "auto"
+      }
+    }
+  },
+  "chapters": {
+    "chapter-crypt": {
+      "id": "chapter-crypt",
+      "name": "The Forgotten Entrance",
+      "seed": 18321,
+      "startRoomInstanceId": "start-node",
+      "goalRoomInstanceId": "ossuary-node",
+      "rooms": {
+        "start-node": {
+          "id": "start-node",
+          "roomPrefabId": "room-entrance",
+          "worldOrigin": [
+            0,
+            0,
+            0
+          ]
+        },
+        "ossuary-node": {
+          "id": "ossuary-node",
+          "roomPrefabId": "room-ossuary",
+          "worldOrigin": [
+            7.2,
+            0,
+            0
+          ]
+        },
+        "secret-node": {
+          "id": "secret-node",
+          "roomPrefabId": "room-secret",
+          "worldOrigin": [
+            7.2,
+            0,
+            -5.4
+          ]
+        }
+      },
+      "edges": {
+        "edge-main": {
+          "id": "edge-main",
+          "from": {
+            "roomInstanceId": "start-node",
+            "socketId": "socket-east"
+          },
+          "to": {
+            "roomInstanceId": "ossuary-node",
+            "socketId": "socket-west"
+          },
+          "state": "open"
+        },
+        "edge-secret": {
+          "id": "edge-secret",
+          "from": {
+            "roomInstanceId": "ossuary-node",
+            "socketId": "socket-north-secret"
+          },
+          "to": {
+            "roomInstanceId": "secret-node",
+            "socketId": "socket-south"
+          },
+          "state": "hidden",
+          "revealGraphId": "logic-secret-wall"
+        }
+      },
+      "bellPhases": [
+        {
+          "id": "silence",
+          "intervalSeconds": 0
+        }
+      ]
+    }
+  },
+  "worldFlags": {
+    "secret-false-burial": false
+  },
+  "editor": {
+    "lastOpenAssetId": "room-entrance",
+    "lastOpenTab": "dungeon",
+    "notes": "A demonstration of references and connections, NOT v1-importable or yet renderable."
+  }
+}
