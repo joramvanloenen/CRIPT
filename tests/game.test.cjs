@@ -32,7 +32,7 @@ class Attribute{
  setY(i,n){if(n>1)verticalUVRepeats++;this.data[i]=n}
 }
 class Geometry extends Obj{
- constructor(...args){super();this.args=args;this.attributes={uv:new Attribute(),normal:new Attribute(),position:new Attribute()};this.attributes.normal.data=Array(24).fill(0)}
+ constructor(...args){super();this.args=args;this.attributes={uv:new Attribute(),normal:new Attribute(),position:new Attribute()};this.attributes.normal.data=Array(24).fill(0);this.attributes.position.data=Array(24).fill(Math.max(1,typeof args[0]==='number'?args[0]:1,typeof args[1]==='number'?args[1]:1,typeof args[2]==='number'?args[2]:1)/2)}
  getAttribute(k){return this.attributes[k]}
  translate(){return this}
 }
