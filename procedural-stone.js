@@ -1,146 +1,130 @@
-/* CRIPT | procedural stone surface compiler.
-   Independent deterministic layers: laid-out masonry, mortar cut, stone body,
-   chips and erosion, dampness, and multi-octave microrelief.
-   Three outputs share one heightfield: albedo, tangent-space normal, roughness. */
+/* CRIPT / Limestone Surface v3
+   Built from separately authored stone courses, mineral strata, eroded rims,
+   microscopic pores and lime joints. Shared height field drives PBR normals;
+   the cut variant has NO painted joints (used on physically separate stones). */
 (function(){
 'use strict';
 const C=window.Cript=window.Cript||{};
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-const fract=v=>v-Math.floor(v);
-const mix=(a,b,t)=>a+(b-a)*t;
+const fract=n=>n-Math.floor(n),mix=(a,b,t)=>a+(b-a)*t;
 const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)};
-const hash=(x,y,seed)=>fract(Math.sin(x*127.17+y*311.71+seed*91.13)*43758.5453123);
-function noise(u,v,n,seed){
- const x=u*n,y=v*n,ix=Math.floor(x),iy=Math.floor(y),fx=fract(x),fy=fract(y);
- const sx=fx*fx*(3-2*fx),sy=fy*fy*(3-2*fy);
- const wrap=q=>(q%n+n)%n;
- const a=hash(wrap(ix),wrap(iy),seed),b=hash(wrap(ix+1),wrap(iy),seed),
-       c=hash(wrap(ix),wrap(iy+1),seed),d=hash(wrap(ix+1),wrap(iy+1),seed);
- return mix(mix(a,b,sx),mix(c,d,sx),sy);
+function hash(x,y,s){
+ let h=Math.imul(x|0,374761393)^Math.imul(y|0,668265263)^Math.imul(s|0,1442695041);
+ h=Math.imul(h^(h>>>13),1274126177);
+ return((h^(h>>>16))>>>0)/4294967296;
 }
-function layered(u,v,seed){
- return (noise(u,v,2,seed)*.41+noise(u,v,4,seed+19)*.28+
-   noise(u,v,8,seed+37)*.18+noise(u,v,16,seed+53)*.09+
-   noise(u,v,32,seed+79)*.04);
+function noise(u,v,n,seed){
+ const x=u*n,y=v*n,ix=Math.floor(x),iy=Math.floor(y);
+ const fx=fract(x),fy=fract(y),sx=fx*fx*(3-2*fx),sy=fy*fy*(3-2*fy);
+ const wrap=q=>(q%n+n)%n;
+ return mix(mix(hash(wrap(ix),wrap(iy),seed),hash(wrap(ix+1),wrap(iy),seed),sx),
+            mix(hash(wrap(ix),wrap(iy+1),seed),hash(wrap(ix+1),wrap(iy+1),seed),sx),sy);
 }
 const presets={
- stone:{type:'wall',base:[103,119,111],mortar:[24,35,33],courses:4,columns:2,relief:.68,depth:.77,erosion:.39,noise:.82,wetness:.42,polish:.18,seed:17,overlay:.08},
- goldstone:{type:'wall',base:[159,130,91],mortar:[48,39,30],courses:4,columns:2,relief:.62,depth:.69,erosion:.33,noise:.76,wetness:.22,polish:.28,seed:31,overlay:.08},
- moss:{type:'wall',base:[80,112,94],mortar:[20,36,32],courses:4,columns:2,relief:.85,depth:.80,erosion:.60,noise:.9,wetness:.68,polish:.08,seed:47,overlay:.05},
- floor:{type:'floor',base:[104,116,107],mortar:[24,35,35],courses:2,columns:2,relief:.67,depth:.85,erosion:.48,noise:.8,wetness:.55,polish:.40,seed:61,overlay:.08}
+ stone:{type:'wall',base:[119,119,108],mortar:[78,80,72],courses:4,columns:2,relief:.88,depth:.69,erosion:.48,noise:1,wetness:.31,polish:.13,seed:17,overlay:.04},
+ goldstone:{type:'wall',base:[153,136,110],mortar:[104,91,75],courses:4,columns:2,relief:.83,depth:.67,erosion:.35,noise:.91,wetness:.26,polish:.20,seed:31,overlay:.04},
+ moss:{type:'wall',base:[99,117,101],mortar:[66,83,66],courses:4,columns:2,relief:.97,depth:.77,erosion:.65,noise:1.12,wetness:.67,polish:.08,seed:47,overlay:.03},
+ floor:{type:'floor',base:[122,119,108],mortar:[88,83,76],courses:2,columns:2,relief:.94,depth:.67,erosion:.55,noise:1.06,wetness:.46,polish:.24,seed:61,overlay:.03}
 };
 function recipeFor(asset){
- const preset=presets[asset?.id]||presets.stone;
- const r=asset?.materialRecipe||{};
- return {...preset,...r,type:r.type||preset.type,
-  base:Array.isArray(r.base)?r.base.slice(0,3):preset.base.slice(),
-  mortar:Array.isArray(r.mortar)?r.mortar.slice(0,3):preset.mortar.slice()};
+ const preset=presets[asset?.id]||presets.stone,r=asset?.materialRecipe||{};
+ return{...preset,...r,type:r.type||preset.type,
+ base:Array.isArray(r.base)?r.base.slice(0,3):preset.base.slice(),
+ mortar:Array.isArray(r.mortar)?r.mortar.slice(0,3):preset.mortar.slice()};
 }
 function build(asset,{size=128,cut=false}={}){
- const recipe=recipeFor(asset);
- size=clamp(Math.floor(size),32,256);
- const seed=+recipe.seed||17,cols=clamp(Math.round(recipe.columns||2),1,8),
-  rows=clamp(Math.round(recipe.courses||4),1,12),
-  erosion=clamp(+recipe.erosion,0,1),strength=clamp(+recipe.relief,0,2),
-  mortar=clamp(+recipe.depth,0,1.5),grain=clamp(+recipe.noise,0,2),
-  overlay=clamp(+recipe.overlay||0,0,.5);
- const height=new Float32Array(size*size);
- const albedo=new Uint8Array(size*size*4),normals=new Uint8Array(size*size*4),
-  roughness=new Uint8Array(size*size*4);
- const isMoss=asset?.id==='moss',floor=recipe.type==='floor';
- const wetness=clamp(Number(recipe.wetness)||0,0,1),polish=clamp(Number(recipe.polish)||0,0,1);
- const edgeWidth=clamp(.010+erosion*.008,.005,.035);
- const wrap=n=>(n%size+size)%size;
- function pixelHeight(u,v){
-  const warpX=(noise(u,v,8,seed+191)-.5)*erosion*.012,
-        warpY=(noise(u,v,8,seed+203)-.5)*erosion*.009;
-  const yy=(v+warpY+1)%1;
-  const rr=yy*rows,row=Math.floor(rr),partY=fract(rr);
-  const offset=row%2?.5:0;
-  const xx=((u+warpX)*cols+offset);
-  const partX=fract(xx);
-  const eY=Math.min(partY,1-partY)/rows;
-  const eX=Math.min(partX,1-partX)/cols;
-  const nearest=Math.min(eX,eY),joint=cut?0:1-smooth(edgeWidth*.25,edgeWidth*1.24,nearest);
-  const chipped=noise(u,v,32,seed+307);
-  const damage=smooth(.67,.92,chipped)*erosion*.082;
-  // Both endpoints of each textured tile share exactly the same mortar and noise.
-  const raw=layered(u,v,seed+107);
-  const larger=noise(u,v,4,seed+111);
-  const stoneId=hash(((Math.floor(xx)%cols)+cols)%cols,row,seed+47);
-  const face=(raw-.5)*.115*grain+(larger-.5)*.09*grain+(stoneId-.5)*.037;
-  const bevel=cut?1:smooth(edgeWidth*.42,edgeWidth*2.35,nearest);
-  const h=(.055+face)*strength*bevel - joint*mortar*.17-damage;
-  return{h,joint,bevel,grain:raw,stoneId,damage,nearest};
- }
+ const r=recipeFor(asset);size=clamp(Math.floor(size),32,256);
+ const seed=Number(r.seed)||17,cols=clamp(Math.round(r.columns||2),1,8),
+ rows=clamp(Math.round(r.courses||4),1,12),erosion=clamp(+r.erosion,0,1),
+ relief=clamp(+r.relief,0,2),depth=clamp(+r.depth,0,1.5),
+ grain=clamp(+r.noise,0,2),wet=clamp(+r.wetness||0,0,1),
+ polish=clamp(+r.polish||0,0,1),overlay=clamp(+r.overlay||0,0,.5);
+ const floor=r.type==='floor',isMoss=asset?.id==='moss',len=size*size;
+ const height=new Float32Array(len),albedo=new Uint8Array(len*4),
+ normals=new Uint8Array(len*4),roughness=new Uint8Array(len*4);
+ const wrap=i=>(i+size)%size;
  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
-  const p=pixelHeight(x/size,y/size),i=y*size+x,j=i*4;
-  height[i]=p.h;
-  const sediment=noise(x/size,y/size,16,seed+401),
-        stains=smooth(.58,.86,noise(x/size,y/size,4,seed+451));
-  const occlusion=1-p.joint*.35;
-  const mineral=(p.grain-.5)*49*grain+(p.stoneId-.5)*31+
-     (sediment-.5)*18 + (p.bevel-.5)*16 - stains*erosion*23;
-  const mossMask=isMoss?smooth(.55,.78,noise(x/size,y/size,8,seed+611))*.72:0;
-  for(let channel=0;channel<3;channel++){
-   let value=mix(recipe.base[channel]+mineral,
-     recipe.mortar[channel]+(p.grain-.5)*14,p.joint*.95);
-   if(isMoss)value=mix(value,[38,87,61][channel],mossMask);
-   if(asset?.pixels?.length && overlay>0){
+  const u=x/size,v=y/size,i=y*size+x,j=i*4;
+  // Each course has its own seam phase, stone tone and asymmetric weathering.
+  const row=Math.floor(v*rows),courseY=fract(v*rows);
+  const long=noise(u,v,3,seed+107),mid=noise(u,v,9,seed+139),
+        small=noise(u,v,32,seed+157),micro=noise(u,v,64,seed+183),
+        strata=noise(u,v,16,seed+201);
+  const seamWarp=(mid-.5)*.014*erosion+(small-.5)*.007*erosion;
+  const rowPhase=(row%2)*.45+hash(0,row,seed+91)*.14;
+  const brickX=u*cols+rowPhase+seamWarp*cols,block=Math.floor(brickX);
+  const localX=fract(brickX),jointX=Math.min(localX,1-localX)/cols;
+  const jointY=Math.min(courseY,1-courseY)/rows;
+  const nearest=Math.min(jointX,jointY);
+  const seamWidth=.0032+erosion*.0022;
+  const wobble=(small-.5)*.0027*erosion;
+  const joint=cut?0:1-smooth(seamWidth*.42,seamWidth*1.8,nearest+wobble);
+  const edge= cut?1:smooth(seamWidth*.5,seamWidth*3.1,nearest+wobble);
+  const id=hash((block%cols+cols)%cols,row,seed+33);
+  // A limestone-like micro-height field: sediment bands, pits and fractured rims.
+  const layers=Math.sin(v*145+long*9+mid*3)*.012;
+  const pits=Math.pow(Math.max(0,small-.58),2)*.20+Math.pow(Math.max(0,micro-.68),2)*.21;
+  const chip=smooth(.71,.92,small)*erosion*.027*(1-edge);
+  const face=(long-.5)*.128+(mid-.5)*.078+(small-.5)*.057+
+     (micro-.5)*.034+layers-pits-(id-.5)*.020;
+  const h=(.07+grain*face)*relief*edge-joint*depth*.13-chip;
+  height[i]=h;
+  // Remove the previous charcoal outline; lime mortar is shaded by
+  // its recess and shares minerals with the stone instead of being black.
+  const iron=smooth(.57,.84,noise(u,v,4,seed+223))*erosion;
+  const variation=(long-.5)*28+(mid-.5)*28+(small-.5)*18+(micro-.5)*9+
+        (strata-.5)*11+(id-.5)*32+layers*90-pits*65-iron*12;
+  const poreShadow=pits*27;
+  const moss=isMoss?smooth(.55,.78,noise(u,v,8,seed+269))*.42:0;
+  for(let k=0;k<3;k++){
+   const base=r.base[k]+variation-poreShadow;
+   let value=mix(base,r.mortar[k]+(mid-.5)*11,joint*.79);
+   if(moss)value=mix(value,[55,93,60][k],moss);
+   if(asset?.pixels?.length&&overlay){
     const aw=Math.max(1,asset.width||32),ah=Math.max(1,asset.height||aw);
-    const px=Math.floor(x/size*aw)%aw,py=Math.floor(y/size*ah)%ah;
-    const str=asset.pixels[py*aw+px];
-    if(typeof str==='string' && /^#[0-9a-f]{6}$/i.test(str)){
-     value=mix(value,parseInt(str.slice(1+channel*2,3+channel*2),16),overlay);
-    }
+    const c=asset.pixels[(Math.floor(v*ah)%ah)*aw+Math.floor(u*aw)%aw];
+    if(typeof c==='string'&&/^#[0-9a-f]{6}$/i.test(c))
+      value=mix(value,parseInt(c.slice(1+k*2,3+k*2),16),overlay);
    }
-   albedo[j+channel]=clamp(Math.round(value*occlusion),0,255);
+   albedo[j+k]=Math.round(clamp(value*(1-joint*.08),0,255));
   }
   albedo[j+3]=255;
-  // Stone smoothness is genuinely spatial: damp patches pool in recesses,
-  // polished high contact edges glint, intact grains remain dry and diffuse.
-  // PBR interprets the grayscale value as roughness, i.e. inverse smoothness.
-  const damp= smooth(.40,.83,noise(x/size,y/size,8,seed+501))
-    *(.42+.58*smooth(.37,.75,noise(x/size,y/size,4,seed+509)));
-  const polished= smooth(.55,.84,noise(x/size,y/size,16,seed+571))*(1-p.joint);
-  const mineralSheen=smooth(.64,.9,sediment)*(1-p.joint);
-  let r=.91+(p.grain-.5)*.1+erosion*.055 - wetness*damp*.51
-        - polish*polished*.34 - mineralSheen*.065;
-  if(floor)r-=.045;
-  if(isMoss)r+=.055;
-  r=mix(clamp(r,.24,.99),.97,p.joint*.95);
-  const rough=Math.round(clamp(r,.22,.99)*255);
-  roughness[j]=roughness[j+1]=roughness[j+2]=rough;roughness[j+3]=255;
+  const damp=smooth(.43,.83,noise(u,v,8,seed+319));
+  const polishMask=smooth(.58,.83,strata)*(1-joint);
+  let rough=.88+(small-.5)*.13+(micro-.5)*.075- wet*damp*.39-
+    polish*polishMask*.24+erosion*.05;
+  if(floor)rough-=.05;
+  if(isMoss)rough+=.06;
+  rough=mix(clamp(rough,.27,.99),.96,joint*.95);
+  const rb=Math.round(clamp(rough,.23,.99)*255);
+  roughness[j]=roughness[j+1]=roughness[j+2]=rb;roughness[j+3]=255;
  }
- // True height-derived tangent normals. Not a sharpen filter over diffuse pixels:
- // grout depth, bevels, erosion and chipped stone all participate independently.
  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
   const dx=(height[y*size+wrap(x+1)]-height[y*size+wrap(x-1)])*.5;
   const dy=(height[wrap(y+1)*size+x]-height[wrap(y-1)*size+x])*.5;
-  const scale=size/128*5.2,nx=-dx*scale,ny=dy*scale,nz=1;
-  const inverse=1/Math.hypot(nx,ny,nz),i=(y*size+x)*4;
-  normals[i]=Math.round(clamp((nx*inverse*.5+.5)*255,0,255));
-  normals[i+1]=Math.round(clamp((ny*inverse*.5+.5)*255,0,255));
-  normals[i+2]=Math.round(clamp((nz*inverse*.5+.5)*255,0,255));normals[i+3]=255;
+  const strength=size/128*5.2,nx=-dx*strength,ny=dy*strength,nz=1,
+        inv=1/Math.hypot(nx,ny,nz),j=(y*size+x)*4;
+  normals[j]=Math.round(clamp((nx*inv*.5+.5)*255,0,255));
+  normals[j+1]=Math.round(clamp((ny*inv*.5+.5)*255,0,255));
+  normals[j+2]=Math.round(clamp((nz*inv*.5+.5)*255,0,255));normals[j+3]=255;
  }
- return{size,width:size,height:size,recipe,albedo,normals,roughness,smoothness:roughness,heightMap:height};
+ return{size,width:size,height:size,recipe:r,albedo,normals,roughness,
+        smoothness:roughness,heightMap:height};
 }
 function textures(THREE,asset,{quality='medium',cut=false}={}){
- const res=quality==='low'?64:quality==='high'?256:128;
- const data=build(asset,{size:res,cut});
+ const size=quality==='low'?64:quality==='high'?256:128;
+ const data=build(asset,{size,cut});
  const make=(pixels,srgb=false)=>{
-  const t=new THREE.DataTexture(pixels,data.size,data.size,THREE.RGBAFormat,THREE.UnsignedByteType);
+  const t=new THREE.DataTexture(pixels,size,size,THREE.RGBAFormat,THREE.UnsignedByteType);
   t.wrapS=t.wrapT=THREE.RepeatWrapping;
-  t.magFilter=THREE.NearestFilter;
-  t.minFilter=THREE.NearestMipmapNearestFilter||THREE.NearestFilter;
-  t.generateMipmaps=true;
-  t.flipY=false;
+  t.magFilter=THREE.LinearFilter||THREE.NearestFilter;
+  t.minFilter=THREE.LinearMipmapLinearFilter||THREE.NearestMipmapNearestFilter||THREE.NearestFilter;
+  t.generateMipmaps=true;t.flipY=false;
   if(srgb)t.colorSpace=THREE.SRGBColorSpace;
-  t.needsUpdate=true;
-  return t;
+  t.needsUpdate=true;return t;
  };
  return{diffuse:make(data.albedo,true),normal:make(data.normals),roughness:make(data.roughness),
-  recipe:data.recipe,size:data.size};
+        recipe:data.recipe,size};
 }
 C.StoneMaterials={presets,recipeFor,build,textures};
 })();
