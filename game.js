@@ -251,7 +251,7 @@ nearest(){
  for(const gate of this.secretGates){
   if(gate.open||gate.opening>0)continue;
   const dx=gate.x-this.hero.x,dz=gate.z-this.hero.z,d=Math.hypot(dx,dz);
-  const facing=(dx*Math.sin(this.hero.yaw)-dz*Math.cos(this.hero.y))/Math.max(d,.001);
+  const facing=(dx*Math.sin(this.hero.yaw)-dz*Math.cos(this.hero.yaw))/Math.max(d,.001);
   if(d<dist&&facing>.22){dist=d;found=gate}
  }
  for(const a of this.props){
