@@ -43,8 +43,51 @@ let e=[];const count=kinds[i]==='combat'?2+kinds[i].length%2:kinds[i]==='boss'?1
 let p=[];p.push({id:'torch-'+i,kind:'torch',x:compact?2:1,z:compact?2:1});p.push({id:'torch-back-'+i,kind:'torch',x:compact?6:7,z:compact?6:7});if([0,4,7,12,15].includes(i))p.push({id:'hearth-'+i,kind:'fireplace',x:6,z:2});p.push({id:'urn-'+i,kind:'urn',x:compact?6:7,z:compact?3:2});if(i===1)p.push({id:'journal-1',kind:'journal',x:6,z:6});if([4,5,7,10,12,14].includes(i))p.push({id:'chest-'+i,kind:'chest',x:6,z:6});if(i===9)p.push({id:'relic-'+i,kind:'relic',x:5,z:6});
 const architecture=roleArchitecture[kinds[i]]||roleArchitecture.combat;rooms['room-'+i]={id:'room-'+i,name:names[i],category:kinds[i],ceilingHeight:architecture[0],vaultStyle:architecture[1],archStyle:architecture[1]==='ribbed'?'pointed':'round',decay:architecture[2],skylight:[4,6,12,15].includes(i),lightingSeeded:1,gx,gz,tiles,doors,theme:i>=12?'void':i<4?'sand':'crypt',enemies:e,props:p,clue:i===9?'The mortar to the south sounds hollow.':i===15?'A bell hangs above the throne.':'',discovered:false};}
 return{version:2,name:'THE FORGOTTEN ENTRANCE',settings:{bellPeriod:100},assets:{textures,characters,props,weapons,vfx,atmosphere},rooms,logic:{'loose-mortar':{id:'loose-mortar',name:'Loose Mortar',room:'room-9',x:4,z:7,type:'interact',requires:'veil',reward:'maul',hint:'The southern masonry seems wrong.'},'bell-gate':{id:'bell-gate',name:'The Bell',room:'room-15',x:4,z:4,type:'boss',requires:'clear',reward:'victory',hint:'When the guardian falls, the Bell answers.'}},encounters:{standard:{id:'standard',name:'Guarded Chamber',sealDoors:false,waves:1,multiplier:1},boss:{id:'boss',name:'The Keeper',sealDoors:true,waves:1,multiplier:2}},editor:{selected:'room-0',quality:'medium'}};}
-C.validate=p=>{if(!p||p.version!==2||!p.assets||!p.rooms)throw Error('A CRIPT version 2 project is required');for(const category of ['textures','characters','props','weapons','vfx','atmosphere'])if(!p.assets[category]||typeof p.assets[category]!=='object')throw Error('Missing asset collection '+category);if(!p.assets.props.fireplace)p.assets.props.fireplace={id:'fireplace',name:'Stone Hearth',width:16,height:16,pixels:art('fireplace'),solid:true,breakable:false,hp:100,loot:''};for(const [id,r]of Object.entries(p.rooms)){if(typeof r.skylight!=='boolean')r.skylight=['room-4','room-6','room-12','room-15'].includes(id);if(!r.lightingSeeded){r.props=r.props||[];const n=Number(id.replace('room-',''));const compact=['trap','merchant','treasure','secret'].includes(r.category);if(!r.props.some(p=>p.id==='torch-back-'+n))r.props.push({id:'torch-back-'+n,kind:'torch',x:compact?6:7,z:compact?6:7});if([0,4,7,12,15].includes(n)&&!r.props.some(p=>p.id==='hearth-'+n))r.props.push({id:'hearth-'+n,kind:'fireplace',x:6,z:2});r.lightingSeeded=1}const defaults=roleArchitecture[r.category]||roleArchitecture.combat;if(!Number.isFinite(r.ceilingHeight))r.ceilingHeight=defaults[0];if(!['flat','barrel','cross','ribbed'].includes(r.vaultStyle))r.vaultStyle=defaults[1];if(!['round','pointed'].includes(r.archStyle))r.archStyle=defaults[1]==='ribbed'?'pointed':'round';if(!Number.isFinite(r.decay))r.decay=defaults[2];if(!Array.isArray(r.tiles)||r.tiles.length!==81)throw Error('Invalid tiles in '+id);for(const t of r.tiles)if(!p.assets.textures[t])throw Error('Unknown texture '+t+' in '+id);for(const e of r.enemies||[])if(!p.assets.characters[e.kind])throw Error('Unknown character '+e.kind);for(const o of r.props||[])if(!p.assets.props[o.kind])throw Error('Unknown prop '+o.kind)}return p};
-C.defaults=defaultProject;C.project=null;try{C.project=C.validate(JSON.parse(localStorage.getItem(C.SAVE_KEY)))}catch(e){C.project=defaultProject()}
+
+/* Two real hidden annexes: a concealed chapel vault and a false ossuary.
+   Their tiles remain traversable behind a runtime stone gate, but all other
+   visible links are filled in. Existing starter saves migrate only once. */
+function installSecretRooms(project){
+ if(project.secretRevision>=1||project.name!=='THE FORGOTTEN ENTRANCE')return project;
+ const rooms=project.rooms;
+ if(!rooms['room-4']||!rooms['room-5']||!rooms['room-8']||!rooms['room-9'])return project;
+ const opposite={N:'S',S:'N',W:'E',E:'W'},dx={N:0,S:0,E:1,W:-1},dz={N:-1,S:1,E:0,W:0};
+ const border={N:4,S:76,W:36,E:44};
+ for(const hiddenId of ['room-5','room-9']){
+  const room=rooms[hiddenId],old=[...room.doors];
+  for(const side of old){
+   const nx=room.gx+dx[side],nz=room.gz+dz[side];
+   if(nx>=0&&nx<4&&nz>=0&&nz<4){
+    const neighbor=rooms['room-'+(nz*4+nx)];
+    neighbor.doors=neighbor.doors.filter(d=>d!==opposite[side]);
+    neighbor.tiles[border[opposite[side]]]='stone';
+   }
+   room.tiles[border[side]]='stone';
+  }
+  room.doors=[];
+  room.category=hiddenId==='room-5'?'treasure':'secret';
+  room.clue=hiddenId==='room-5'?'A forgotten reliquary, brimming with offerings.':'Behind the false stones lies a forgotten burial treasury.';
+  room.enemies=[];
+  room.props=room.props||[];
+  if(!room.props.some(o=>o.kind==='chest'))room.props.push({id:'hidden-chest-'+hiddenId,kind:'chest',x:5,z:5});
+  if(!room.props.some(o=>o.kind==='relic'))room.props.push({id:'hidden-relic-'+hiddenId,kind:'relic',x:3,z:6});
+ }
+ const passages=[
+  {id:'reliquary-gate',from:'room-4',to:'room-5',side:'E',name:'Loose chapel masonry',hint:'A thin draft slips between uneven stones.'},
+  {id:'ossuary-gate',from:'room-8',to:'room-9',side:'E',name:'Hollow ossuary wall',hint:'The mortar rings hollow beneath your fingers.'}
+ ];
+ for(const gate of passages){
+  const from=rooms[gate.from],to=rooms[gate.to],op=opposite[gate.side];
+  from.tiles[border[gate.side]]='floor';to.tiles[border[op]]='floor';
+  from.doors=from.doors.filter(d=>d!==gate.side);to.doors=to.doors.filter(d=>d!==op);
+ }
+ project.secretPassages=passages;
+ project.secretRevision=1;
+ return project;
+}
+
+C.validate=p=>{if(!p||p.version!==2||!p.assets||!p.rooms)throw Error('A CRIPT version 2 project is required');for(const category of ['textures','characters','props','weapons','vfx','atmosphere'])if(!p.assets[category]||typeof p.assets[category]!=='object')throw Error('Missing asset collection '+category);if(!p.assets.props.fireplace)p.assets.props.fireplace={id:'fireplace',name:'Stone Hearth',width:16,height:16,pixels:art('fireplace'),solid:true,breakable:false,hp:100,loot:''};for(const [id,r]of Object.entries(p.rooms)){if(typeof r.skylight!=='boolean')r.skylight=['room-4','room-6','room-12','room-15'].includes(id);if(!r.lightingSeeded){r.props=r.props||[];const n=Number(id.replace('room-',''));const compact=['trap','merchant','treasure','secret'].includes(r.category);if(!r.props.some(p=>p.id==='torch-back-'+n))r.props.push({id:'torch-back-'+n,kind:'torch',x:compact?6:7,z:compact?6:7});if([0,4,7,12,15].includes(n)&&!r.props.some(p=>p.id==='hearth-'+n))r.props.push({id:'hearth-'+n,kind:'fireplace',x:6,z:2});r.lightingSeeded=1}const defaults=roleArchitecture[r.category]||roleArchitecture.combat;if(!Number.isFinite(r.ceilingHeight))r.ceilingHeight=defaults[0];if(!['flat','barrel','cross','ribbed'].includes(r.vaultStyle))r.vaultStyle=defaults[1];if(!['round','pointed'].includes(r.archStyle))r.archStyle=defaults[1]==='ribbed'?'pointed':'round';if(!Number.isFinite(r.decay))r.decay=defaults[2];if(!Array.isArray(r.tiles)||r.tiles.length!==81)throw Error('Invalid tiles in '+id);for(const t of r.tiles)if(!p.assets.textures[t])throw Error('Unknown texture '+t+' in '+id);for(const e of r.enemies||[])if(!p.assets.characters[e.kind])throw Error('Unknown character '+e.kind);for(const o of r.props||[])if(!p.assets.props[o.kind])throw Error('Unknown prop '+o.kind)}return installSecretRooms(p)};
+C.defaults=()=>installSecretRooms(defaultProject());C.project=null;try{C.project=C.validate(JSON.parse(localStorage.getItem(C.SAVE_KEY)))}catch(e){C.project=C.defaults()}
 C.save=()=>{try{localStorage.setItem(C.SAVE_KEY,JSON.stringify(C.project));document.getElementById('saveMark')?.classList.add('saved')}catch(e){C.notice('Storage full: export a world pack')}};
 C.notice=(msg)=>{const el=document.getElementById('toast');if(!el)return;el.textContent=msg;clearTimeout(C.noticeTimer);C.noticeTimer=setTimeout(()=>el.textContent='',2800)};
 C.export=()=>{const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(C.project,null,2)],{type:'application/json'}));a.href=url;a.download='cript-world-v2.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)};
