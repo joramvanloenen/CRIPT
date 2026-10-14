@@ -100,7 +100,7 @@ class BakedLighting{
      'float ripples=.88+.12*sin(vWorld.x*2.2+vWorld.z*3.6+uTime*.22);',
      'float fade=clamp((vPos.y+4.0)/8.0,.32,1.0);',
      'float a=(.027+.025*ripples)*fade;',
-     'gl_FragColor=vec4(uColor*a,a);',
+     'gl_FragColor=vec4(uColor*(.34+.20*ripples),a);',
      '}'
     ].join('\n')
    });
@@ -113,6 +113,47 @@ class BakedLighting{
    this.moons.push({x,z,shaft,spot});
   }
  }
+ cacheKey(payload){
+  const signature=JSON.stringify({rooms:payload.rooms,sources:payload.sources,
+    nx:payload.nx,nz:payload.nz,ny:payload.ny,ver:'baked-gi-ao-v3'});
+  let hash=2166136261;
+  for(let i=0;i<signature.length;i++){
+   hash^=signature.charCodeAt(i);hash=Math.imul(hash,16777619);
+  }
+  return 'bake-'+(hash>>>0).toString(16);
+ }
+ openCache(){
+  if(this.cacheDB)return this.cacheDB;
+  if(typeof indexedDB==='undefined')return Promise.resolve(null);
+  this.cacheDB=new Promise(resolve=>{
+   try{
+    const request=indexedDB.open('CRIPT-GI-Lightmaps',1);
+    request.onupgradeneeded=()=>{
+     if(!request.result.objectStoreNames.contains('atlases'))request.result.createObjectStore('atlases');
+    };
+    request.onsuccess=()=>resolve(request.result);
+    request.onerror=()=>resolve(null);
+    request.onblocked=()=>resolve(null);
+   }catch(e){resolve(null)}
+  });
+  return this.cacheDB;
+ }
+ async readCache(key){
+  const db=await this.openCache();if(!db)return null;
+  return new Promise(resolve=>{
+   try{
+    const req=db.transaction('atlases','readonly').objectStore('atlases').get(key);
+    req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>resolve(null);
+   }catch(e){resolve(null)}
+  });
+ }
+ async writeCache(key,buffer){
+  const db=await this.openCache();if(!db)return;
+  try{
+   const store=db.transaction('atlases','readwrite').objectStore('atlases');
+   store.put(buffer,key);
+  }catch(e){}
+ }
  schedule(){
   const token=++this.generation;if(this.timer)clearTimeout(this.timer);
   this.timer=setTimeout(()=>this.bake(token),170);
@@ -124,27 +165,40 @@ class BakedLighting{
    solid:r.tiles.map(id=>!!this.project.assets.textures[id]?.solid)
   }));
   const payload={...R,token,rooms,sources:this.sources()};
-  const finish=msg=>{
+  const key=this.cacheKey(payload);
+  const finish=(msg,cached=false)=>{
    if(this.disposed||msg.token!==this.generation||msg.error||!msg.result)return;
    const next=this.makeTexture(new Uint8Array(msg.result.buffer)),prev=this.texture;
    this.uniform.value=next;this.texture=next;prev.dispose?.();
    this.stats=msg.result.statistics;
+   this.stats.cached=cached;
+   if(!cached)this.writeCache(key,msg.result.buffer);
   };
   const fallback=()=>setTimeout(()=>{
    if(this.disposed||token!==this.generation||!window.CriptGIWorker)return;
    finish({token,result:window.CriptGIWorker.bake(payload)});
   },0);
-  if(typeof Worker!=='undefined'&&(typeof location==='undefined'||location.protocol!=='file:')){
-   try{
-    if(this.worker)this.worker.terminate();
-    const worker=new Worker('lighting-bake-worker.js');
-    this.worker=worker;
-    worker.onmessage=e=>{finish(e.data);worker.terminate();if(this.worker===worker)this.worker=null};
-    worker.onerror=()=>{worker.terminate();if(this.worker===worker)this.worker=null;fallback()};
-    worker.postMessage(payload);return;
-   }catch(e){this.worker?.terminate();this.worker=null}
-  }
-  fallback();
+  const runWorker=()=>{
+   if(token!==this.generation||this.disposed)return;
+   if(typeof Worker!=='undefined'&&(typeof location==='undefined'||location.protocol!=='file:')){
+    try{
+     if(this.worker)this.worker.terminate();
+     const worker=new Worker('lighting-bake-worker.js');
+     this.worker=worker;
+     worker.onmessage=e=>{finish(e.data);worker.terminate();if(this.worker===worker)this.worker=null};
+     worker.onerror=()=>{worker.terminate();if(this.worker===worker)this.worker=null;fallback()};
+     worker.postMessage(payload);return;
+    }catch(e){this.worker?.terminate();this.worker=null}
+   }
+   fallback();
+  };
+  this.readCache(key).then(buffer=>{
+   if(this.disposed||token!==this.generation)return;
+   if(buffer&&buffer.byteLength===R.nx*R.nz*R.ny*4)
+    finish({token,result:{buffer,statistics:{lights:payload.sources.length,
+      samples:R.nx*R.nz*R.ny,occlusions:0}}},true);
+   else runWorker();
+  }).catch(runWorker);
  }
  update(x,z,time){
   this.timeUniform.value=time;
