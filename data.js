@@ -86,9 +86,31 @@ function installSecretRooms(project){
  return project;
 }
 
-C.validate=p=>{if(!p||p.version!==2||!p.assets||!p.rooms)throw Error('A CRIPT version 2 project is required');for(const category of ['textures','characters','props','weapons','vfx','atmosphere'])if(!p.assets[category]||typeof p.assets[category]!=='object')throw Error('Missing asset collection '+category);if(!p.assets.meshes||!Object.keys(p.assets.meshes).length)p.assets.meshes=C.copy(C.MeshForge?.presets||{});if(!p.assets.props.fireplace)p.assets.props.fireplace={id:'fireplace',name:'Stone Hearth',width:16,height:16,pixels:art('fireplace'),solid:true,breakable:false,hp:100,loot:''};for(const [id,r]of Object.entries(p.rooms)){if(typeof r.skylight!=='boolean')r.skylight=['room-4','room-6','room-12','room-15'].includes(id);if(!r.lightingSeeded){r.props=r.props||[];const n=Number(id.replace('room-',''));const compact=['trap','merchant','treasure','secret'].includes(r.category);if(!r.props.some(p=>p.id==='torch-back-'+n))r.props.push({id:'torch-back-'+n,kind:'torch',x:compact?6:7,z:compact?6:7});if([0,4,7,12,15].includes(n)&&!r.props.some(p=>p.id==='hearth-'+n))r.props.push({id:'hearth-'+n,kind:'fireplace',x:6,z:2});r.lightingSeeded=1}const defaults=roleArchitecture[r.category]||roleArchitecture.combat;if(!Number.isFinite(r.ceilingHeight))r.ceilingHeight=defaults[0];if(!['flat','barrel','cross','ribbed'].includes(r.vaultStyle))r.vaultStyle=defaults[1];if(!['round','pointed'].includes(r.archStyle))r.archStyle=defaults[1]==='ribbed'?'pointed':'round';if(!Number.isFinite(r.decay))r.decay=defaults[2];if(!Array.isArray(r.tiles)||r.tiles.length!==81)throw Error('Invalid tiles in '+id);for(const t of r.tiles)if(!p.assets.textures[t])throw Error('Unknown texture '+t+' in '+id);for(const e of r.enemies||[])if(!p.assets.characters[e.kind])throw Error('Unknown character '+e.kind);for(const o of r.props||[])if(!p.assets.props[o.kind])throw Error('Unknown prop '+o.kind)}return installSecretRooms(p)};
+// Upgrade only untouched stock meshes; never overwrite a deliberately modified model.
+function upgradeStockMeshes(project){
+ const F=C.MeshForge||{},original=F.legacyPresets||{},curated=F.curated||{};
+ if(!project.assets.meshes||!Object.keys(project.assets.meshes).length){
+  project.assets.meshes=C.copy(F.presets||{});C.meshUpgrade={updated:Object.keys(curated).length,preserved:0};return;
+ }
+ let updated=0,preserved=0;
+ for(const [id,recipe]of Object.entries(project.assets.meshes)){
+  if(!curated[id]||!original[id]||recipe.artPass==='gothic-01')continue;
+  const old=original[id],keys=new Set([...Object.keys(old),...Object.keys(recipe)]);
+  let unchanged=true;
+  for(const key of keys){
+   if(key==='artPass')continue;
+   if(JSON.stringify(old[key])!==JSON.stringify(recipe[key])){unchanged=false;break}
+  }
+  if(unchanged){project.assets.meshes[id]=C.copy(F.presets[id]);updated++}
+  else preserved++;
+ }
+ C.meshUpgrade={updated,preserved};
+ if(updated)project.visualAssetPass='gothic-01';
+}
+C.validate=p=>{if(!p||p.version!==2||!p.assets||!p.rooms)throw Error('A CRIPT version 2 project is required');for(const category of ['textures','characters','props','weapons','vfx','atmosphere'])if(!p.assets[category]||typeof p.assets[category]!=='object')throw Error('Missing asset collection '+category);upgradeStockMeshes(p);if(!p.assets.props.fireplace)p.assets.props.fireplace={id:'fireplace',name:'Stone Hearth',width:16,height:16,pixels:art('fireplace'),solid:true,breakable:false,hp:100,loot:''};for(const [id,r]of Object.entries(p.rooms)){if(typeof r.skylight!=='boolean')r.skylight=['room-4','room-6','room-12','room-15'].includes(id);if(!r.lightingSeeded){r.props=r.props||[];const n=Number(id.replace('room-',''));const compact=['trap','merchant','treasure','secret'].includes(r.category);if(!r.props.some(p=>p.id==='torch-back-'+n))r.props.push({id:'torch-back-'+n,kind:'torch',x:compact?6:7,z:compact?6:7});if([0,4,7,12,15].includes(n)&&!r.props.some(p=>p.id==='hearth-'+n))r.props.push({id:'hearth-'+n,kind:'fireplace',x:6,z:2});r.lightingSeeded=1}const defaults=roleArchitecture[r.category]||roleArchitecture.combat;if(!Number.isFinite(r.ceilingHeight))r.ceilingHeight=defaults[0];if(!['flat','barrel','cross','ribbed'].includes(r.vaultStyle))r.vaultStyle=defaults[1];if(!['round','pointed'].includes(r.archStyle))r.archStyle=defaults[1]==='ribbed'?'pointed':'round';if(!Number.isFinite(r.decay))r.decay=defaults[2];if(!Array.isArray(r.tiles)||r.tiles.length!==81)throw Error('Invalid tiles in '+id);for(const t of r.tiles)if(!p.assets.textures[t])throw Error('Unknown texture '+t+' in '+id);for(const e of r.enemies||[])if(!p.assets.characters[e.kind])throw Error('Unknown character '+e.kind);for(const o of r.props||[])if(!p.assets.props[o.kind])throw Error('Unknown prop '+o.kind)}return installSecretRooms(p)};
 C.defaults=()=>installSecretRooms(defaultProject());C.project=null;try{C.project=C.validate(JSON.parse(localStorage.getItem(C.SAVE_KEY)))}catch(e){C.project=C.defaults()}
 C.save=()=>{try{localStorage.setItem(C.SAVE_KEY,JSON.stringify(C.project));document.getElementById('saveMark')?.classList.add('saved')}catch(e){C.notice('Storage full: export a world pack')}};
+if(C.meshUpgrade?.updated)C.save();
 C.notice=(msg)=>{const el=document.getElementById('toast');if(!el)return;el.textContent=msg;clearTimeout(C.noticeTimer);C.noticeTimer=setTimeout(()=>el.textContent='',2800)};
 C.export=()=>{const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(C.project,null,2)],{type:'application/json'}));a.href=url;a.download='cript-world-v2.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)};
 C.import=async file=>{if(file.size>4000000)throw Error('Pack exceeds 4MB');const p=C.validate(JSON.parse(await file.text()));C.project=C.copy(p);C.save();return p};
