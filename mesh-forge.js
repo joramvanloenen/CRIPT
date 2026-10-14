@@ -74,13 +74,16 @@ function lathe(profile,opts={}){
    const radius=r*wave;ring.push([Math.cos(theta)*radius,y,Math.sin(theta)*radius]);
   }rings.push(ring);
  }
- for(let j=0;j<rings.length-1;j++)for(let i=0;i<n;i++){
-  const next=(i+1)%n;
-  mesh.quad(rings[j][i],rings[j+1][i],rings[j+1][next],rings[j][next]);
+ const closed=!!opts.closeProfile;
+ for(let j=0;j<(closed?rings.length:rings.length-1);j++)for(let i=0;i<n;i++){
+  const next=(i+1)%n,k=(j+1)%rings.length;
+  mesh.quad(rings[j][i],rings[k][i],rings[k][next],rings[j][next]);
  }
- // Note: positive theta around +Y is clockwise from above.
- for(const [ring,y,top] of [[rings[0],profile[0][1],false],[rings.at(-1),profile.at(-1)[1],true]]){
-  for(let i=0;i<n;i++){const k=(i+1)%n;if(top)mesh.triangle([0,y,0],ring[i],ring[k]);else mesh.triangle([0,y,0],ring[k],ring[i]);}
+ if(!closed){
+  // Note: positive theta around +Y is clockwise from above.
+  for(const [ring,y,top] of [[rings[0],profile[0][1],false],[rings.at(-1),profile.at(-1)[1],true]]){
+   for(let i=0;i<n;i++){const k=(i+1)%n;if(top)mesh.triangle([0,y,0],ring[i],ring[k]);else mesh.triangle([0,y,0],ring[k],ring[i]);}
+  }
  }return mesh;
 }
 function sweep(path,section){
@@ -123,9 +126,18 @@ function build(recipe){
   const r=clamp(+recipe.radius||.31,.06,1.9),profile=[[r*1.35,0],[r*1.30,.10],[r,.22],[r*.90,.37],[r*.89,h-.3],[r,h-.18],[r*1.32,h-.12],[r*1.42,h]];
   result=lathe(profile,{segments:recipe.segments,flutes:recipe.flutes,fluteDepth:recipe.fluteDepth});
  }else if(type==='urn'||type==='bell'){
-  const p=type==='urn'?[[.19,0],[.24,.05],[.27,.15],[.39,.38],[.49,.62],[.44,.97],[.29,1.21],[.24,1.38],[.32,1.45]]:
-   [[.22,.05],[.39,.12],[.49,.24],[.53,.44],[.49,.63],[.38,.78],[.28,.95],[.13,1.08],[.1,1.24]];
-  result=lathe(p.map(q=>[q[0]*w,q[1]*h/1.45]),{segments:recipe.segments||24});
+  const p=type==='urn'?[
+    [.19,0],[.24,.05],[.27,.15],[.39,.38],[.49,.62],[.44,.97],
+    [.29,1.21],[.24,1.38],[.32,1.45], // outside neck and broad lip
+    [.28,1.47],[.22,1.39],[.17,1.19],[.28,.78],[.30,.55],[.13,.20],[.08,.08]
+   ]:[
+    [.49,.12],[.53,.20],[.49,.33],[.53,.49],[.43,.71],[.30,.92],[.15,1.14],
+    [.10,1.24],[.08,1.23],[.12,1.12],[.25,.86],[.36,.70],
+    [.43,.49],[.43,.29],[.40,.18]
+   ];
+  // Trace exterior and interior as one closed cross-section: there is a real
+  // throat/opening, no primitive cap sealing the top of an urn or bell.
+  result=lathe(p.map(q=>[q[0]*w,q[1]*h/1.47]),{segments:recipe.segments||24,closeProfile:true});
  }else if(type==='rib'){
   const span=clamp(+recipe.span||4,.6,12),rise=clamp(+recipe.rise||1.7,.2,6),steps=clamp(Math.round(+recipe.segments||16),4,48);
   const path=Array.from({length:steps+1},(_,i)=>{
