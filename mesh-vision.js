@@ -154,7 +154,7 @@ function refine(recipe,targets,{iterations=3,size=64,views=VIEWS}={}){
    }
    if(choice){
     const before=best.score;best=choice;accepted++;improved=true;
-    history.push({step:accepted,pass,key,direction,delta:+(best.score-before).toFixed(6),
+    history.push({step:accepted,pass,key,direction:choice.direction,delta:+(best.score-before).toFixed(6),
      score:best.score,recipe:best.recipe,metrics:best.views});
    }
   }
