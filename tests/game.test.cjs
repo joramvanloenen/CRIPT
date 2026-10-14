@@ -100,6 +100,43 @@ C.WeaponRig.tick(game,1);assert.equal(game.attackAnim,null,'Recovery failed to f
 const pose0=C.WeaponRig.samplePose(.06,false,1);
 const pose1=C.WeaponRig.samplePose(.39,false,1);
 assert.ok(Math.abs(pose0.rz-pose1.rz)>.4,'Swing arc too small');
+
+const weaponTypes=['rust','axe','cleaver','maul'];
+for(let tier=1;tier<=4;tier++){
+ const def=C.project.assets.weapons[weaponTypes[tier-1]];
+ const right=C.WeaponRig.pathFor(tier,false,1);
+ const left=C.WeaponRig.pathFor(tier,false,-1);
+ const heavy=C.WeaponRig.pathFor(tier,true,1);
+ assert.equal(right.length,5,'Full attack requires windup, strike, follow-through and recovery');
+ assert.ok(Math.abs(right[2].px-right[0].px)>.19,'Weapon must translate across the camera, not only spin: '+tier);
+ assert.ok(Math.abs(right[2].pz-right[0].pz)>.18,'Blade must travel forwards into 3D space: '+tier);
+ assert.ok(Math.abs(right[2].rx-right[0].rx)>.15,'Weapon must pitch during swing: '+tier);
+ assert.ok(Math.abs(right[2].ry-right[0].ry)>.03,'Weapon must yaw around grip, not only roll: '+tier);
+ assert.notDeepEqual(right.slice(1,4).map(k=>k.rz),left.slice(1,4).map(k=>k.rz),
+  'Alternate slashes must have different directions: '+tier);
+ assert.ok(heavy[1].py>right[1].py,'Heavy windup must raise weapon: '+tier);
+ const impact=C.WeaponRig.impactTime(tier,false,1);
+ assert.ok(impact>right[1].t&&impact<right[2].t,'Contact must happen during forward cutting stroke: '+tier);
+ const pose=C.WeaponRig.samplePose(impact,false,1,tier);
+ assert.ok(Math.cos(pose.rx)*Math.cos(pose.ry)>.53,'Blade face becomes unreadably edge-on at impact: '+tier);
+ assert.ok(C.WeaponRig.releaseTime(tier,false,1)<impact,'Whoosh must precede impact: '+tier);
+}
+const sweepR=C.WeaponRig.samplePose(.46,false,1,1);
+const sweepL=C.WeaponRig.samplePose(.46,false,-1,1);
+assert.ok(Math.abs(sweepR.px-sweepL.px)>.38,'Alternating sword attacks should travel across different sides of camera');
+const sword=game.hero.weapon;
+game.hero.weapon='rust';game.makeWeapon();game.strike(false);
+const fastDuration=game.attackAnim.duration;
+assert.ok(fastDuration<.43,'Sword swing should accelerate relative to original animation');
+game.attackAnim.t=game.attackAnim.duration-.06;
+game.hero.attack=.06;
+game.strike(false);
+assert.ok(game.queuedStrike,'Repeated attack during recovery should buffer next slash');
+C.WeaponRig.tick(game,.10);
+assert.ok(game.attackAnim&&!game.attackAnim.hit,'Buffered strike should flow into next attack');
+assert.equal(game.queuedStrike,null,'Buffered input must be consumed exactly once');
+game.hero.weapon=sword;
+
 const html=fs.readFileSync('index.html','utf8'),css=fs.readFileSync('style.css','utf8');
 assert.ok(html.indexOf('src="weapons.js"')<html.indexOf('src="game.js"'),'Weapon rig must load before engine');
 for(const key of ['q','e','w','a','s','d','f','attack','dodge','spell']){
