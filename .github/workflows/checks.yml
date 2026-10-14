@@ -15,10 +15,13 @@ jobs:
         run: |
           node --check data.js
           node --check weapons.js
+          node --check procedural-stone.js
+          node --check architecture.js
           node --check game.js
           node --check editor.js
           node --check audio.js
       - name: Check content
         run: |
           node tests/world.test.cjs
+          node tests/materials.test.cjs
           node tests/game.test.cjs
