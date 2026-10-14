@@ -72,6 +72,7 @@ resetActors(){
  }
 }
 makeWeapon(){
+ C.WeaponRig.resetTrail?.(this);
  this.weaponView.clear();
  const def=C.project.assets.weapons[this.hero.weapon]||C.project.assets.weapons.rust;
  this.weaponView.add(C.WeaponRig.create(def));
