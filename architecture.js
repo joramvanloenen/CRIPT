@@ -474,7 +474,7 @@ class Masonry{
   // Taller rooms also carry cross-vault ribs between the pillars, high overhead.
   if(monumental){
    for(const side of [-1,1]){
-    this.modeled(room,'trim','vault-rib',x,h-.69,z+side*3.0,
+    this.modeled(room,'trim','vault-rib',x,h-2.74,z+side*3.0,
       9.2,2.3,.29,0);
     this.count.ribbedBays=(this.count.ribbedBays||0)+1;
    }
