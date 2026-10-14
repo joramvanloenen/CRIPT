@@ -75,7 +75,7 @@ makeWeapon(){
  this.weaponView.clear();
  const def=C.project.assets.weapons[this.hero.weapon]||C.project.assets.weapons.rust;
  this.weaponView.add(C.WeaponRig.create(def));
- this.attackAnim=null;
+ this.attackAnim=null;this.queuedStrike=null;
  $('weaponName').textContent=def.name;
 }
 
@@ -133,28 +133,54 @@ free(dt){const p=this.hero;const turn=(this.keys.has('e')?1:0)-(this.keys.has('q
  }
 }
 strike(heavy){
- if(!this.running||this.paused)return;
- const p=this.hero,w=C.project.assets.weapons[p.weapon];if(!w||p.attack>0||p.st<w.stamina*(heavy?1.7:1))return;
- this.alert();p.st-=w.stamina*(heavy?1.7:1);p.regen=.65;
- const duration=Math.max(.3,w.cooldown*(heavy?1.48:1));
+ if(!this.running||this.paused)return false;
+ const p=this.hero,w=C.project.assets.weapons[p.weapon];
+ if(!w)return false;
+ if(p.attack>0||this.attackAnim){
+  // One buffered follow-up during recovery, never an unbounded attack queue.
+  const remaining=this.attackAnim?this.attackAnim.duration-this.attackAnim.t:Infinity;
+  if(remaining<.20)this.queuedStrike={heavy:!!heavy};
+  return false;
+ }
+ const cost=w.stamina*(heavy?1.7:1);
+ if(p.st<cost){C.notice('NOT ENOUGH STAMINA');return false;}
+ this.alert();p.st-=cost;p.regen=heavy?.83:.51;
+ const tier=Math.max(1,Math.min(4,Math.round(w.weight||w.tier||1)));
+ // Blade speed ≠ raw weapon cooldown: rapid sword slashes, committed heavy
+ // cleaves. Damage triggers when the animated blade crosses the aim point.
+ const speed=[0,.90,.78,.72,.75][tier];
+ const duration=Math.max(.30,w.cooldown*speed*(heavy?1.38:1));
  p.attack=duration;
  this.attackCount=(this.attackCount||0)+1;
- this.attackAnim={t:0,duration,heavy:!!heavy,side:this.attackCount%2?1:-1,hit:false};
- this.hud();
+ this.queuedStrike=null;
+ this.attackAnim={t:0,duration,tier,heavy:!!heavy,
+  side:this.attackCount%2?1:-1,hit:false,released:false,hitStop:0};
+ this.hud();return true;
 }
 resolveStrike(heavy){
- const p=this.hero,w=C.project.assets.weapons[p.weapon];if(!w)return;
+ const p=this.hero,w=C.project.assets.weapons[p.weapon];
+ if(!w)return 0;
  let hits=0;
  for(const e of this.enemies){
   if(!e.alive)continue;
-  const d=Math.hypot(e.x-p.x,e.z-p.z),dot=((e.x-p.x)*Math.sin(p.yaw)-(e.z-p.z)*Math.cos(p.yaw))/Math.max(.001,d);
-  if(d<w.reach*(heavy?1.15:1)&&dot>(heavy?.10:.37)&&this.lineOfSight(p.x,p.z,e.x,e.z)){
-   e.hp-=w.damage*(heavy?1.85:1);e.stun=heavy?.68:.23;hits++;
+  const d=Math.hypot(e.x-p.x,e.z-p.z),
+   dot=((e.x-p.x)*Math.sin(p.yaw)-(e.z-p.z)*Math.cos(p.yaw))/Math.max(.001,d);
+  if(d<w.reach*(heavy?1.16:1)&&dot>(heavy?.13:.31)&&this.lineOfSight(p.x,p.z,e.x,e.z)){
+   e.hp-=w.damage*(heavy?1.85:1);
+   e.stun=heavy?.73:.27;
+   e.flash=.115;hits++;
    this.emit(e.x,1,e.z,'blood');
    if(e.hp<=0)this.kill(e);
   }
  }
- if(hits){this.hitShake=heavy?.055:.025;if(C.audio)C.audio.effect('hit')}
+ if(hits){
+  const weight=w.weight||1;
+  this.impactPitch=heavy?-.074:-.029-.005*weight;
+  this.impactRoll=this.attackAnim?.side>0?-.016:.016;
+  this.impactPush=heavy?.06:.03;
+  if(C.audio)C.audio.effect(heavy?'hitHeavy':'hit');
+ }
+ return hits;
 }
 kill(e){e.alive=false;this.actors.remove(e.mesh);this.hero.kills++;this.hero.souls+=e.def.reward;if(e.kind==='brute'&&this.room?.id==='room-15'){this.flags.add('bell-rung');C.notice('THE BELL KEEPER FALLS — CHAPTER COMPLETE');this.hero.hp=Math.min(100,this.hero.hp+30)}}
 spell(type){if(!this.running||this.paused)return;const p=this.hero,cost=type==='ember'?22:30;if(p.mp<cost){C.notice('NOT ENOUGH ARCANA');return}p.mp-=cost;this.alert();this.emit(p.x+Math.sin(p.yaw)*1.5,1.4,p.z-Math.cos(p.yaw)*1.5,'magic');
@@ -162,7 +188,9 @@ spell(type){if(!this.running||this.paused)return;const p=this.hero,cost=type==='
  this.hud()}
 dodge(){if(!this.running||this.paused||this.hero.st<24)return;this.alert();this.hero.st-=24;this.hero.dodge=.24;this.hero.regen=.85;C.notice('DODGE')}
 hurt(amount){const p=this.hero;if(p.injured>0||p.dodge>.08)return;this.alert();p.hp=Math.max(0,p.hp-amount);p.injured=.8;this.emit(p.x,1,p.z,'blood');if(p.hp<=0){this.running=false;this.paused=true;$('deathText').textContent='Lost after '+p.kills+' enemies and '+this.seen.size+' discovered rooms.';$('deathPanel').classList.remove('hide');if(document.pointerLockElement)document.exitPointerLock?.()}this.hud()}
-updateEnemies(dt){const p=this.hero;for(const e of this.enemies){if(!e.alive)continue;const dist=Math.hypot(e.x-p.x,e.z-p.z);e.mesh.lookAt(this.camera.position.x,e.mesh.position.y,this.camera.position.z);e.attack-=dt;e.stun=Math.max(0,e.stun-dt);e.phase+=dt;if(dist>17||e.stun>0)continue;
+updateEnemies(dt){const p=this.hero;for(const e of this.enemies){if(!e.alive)continue;const dist=Math.hypot(e.x-p.x,e.z-p.z);e.mesh.lookAt(this.camera.position.x,e.mesh.position.y,this.camera.position.z);e.attack-=dt;e.stun=Math.max(0,e.stun-dt);e.phase+=dt;
+  if(e.flash>0){e.flash=Math.max(0,e.flash-dt);e.mesh.material.color?.setHex?.(e.flash>0?0xffae91:0xffffff);}
+  if(dist>17||e.stun>0)continue;
  if(dist<e.def.aggro&&this.lineOfSight(e.x,e.z,p.x,p.z)){this.alert();const dx=(p.x-e.x)/Math.max(dist,.01),dz=(p.z-e.z)/Math.max(dist,.01);if(dist>1.3){const speed=e.def.speed*(e.def.ai==='charge'&&e.phase%5<.5?2.4:1);if(this.can(e.x+dx*dt*speed,e.z+dz*dt*speed,.26)){e.x+=dx*dt*speed;e.z+=dz*dt*speed}}
  if(dist<1.35&&e.attack<=0){this.hurt(e.def.damage);e.attack=e.def.ai==='charge'?1.7:1.1}}
  e.mesh.position.set(e.x,1+Math.sin(e.phase*3)*.055,e.z)}}
@@ -203,7 +231,16 @@ update(dt){if(!this.running||this.paused)return;const p=this.hero;this.time+=dt;
  if(this.frame%10===0)this.hud()}
 loop(now){requestAnimationFrame(t=>this.loop(t));const dt=Math.min(.04,Math.max(0,(now-this.last)/1000));this.last=now;this.frame++;this.update(dt);
  const p=this.hero;const targetFloor=this.architecture?.floorHeightAt(p.x,p.z)||0;this.eyeFloor=(this.eyeFloor||0)+(targetFloor-(this.eyeFloor||0))*Math.min(1,dt*12);this.camera.position.set(p.x,1.62+this.eyeFloor+Math.sin(this.time*9)*(p.step?.026:.01),p.z);this.camera.rotation.set(p.pitch,-p.yaw,0,'YXZ');this.lantern.position.copy(this.camera.position);this.lantern.position.y-=.15;
- C.WeaponRig.tick(this,this.paused?0:dt);this.hitShake=Math.max(0,(this.hitShake||0)-dt*.25);if(this.hitShake)this.camera.rotation.x+=(Math.random()-.5)*this.hitShake;
+ C.WeaponRig.tick(this,this.paused?0:dt);
+ // A damped directional recoil replaces the previous random camera jitter.
+ const settle=Math.exp(-dt*16);
+ this.impactPitch=(this.impactPitch||0)*settle;
+ this.impactRoll=(this.impactRoll||0)*settle;
+ this.impactPush=(this.impactPush||0)*settle;
+ this.camera.rotation.x+=this.impactPitch;
+ this.camera.rotation.z=this.impactRoll;
+ this.camera.position.x-=Math.sin(p.yaw)*this.impactPush;
+ this.camera.position.z+=Math.cos(p.yaw)*this.impactPush;
  this.renderer.render(this.scene,this.camera);if(this.frame%40===0)$('fps').textContent=Math.round(1/Math.max(.001,dt))+' FPS / '+(this.mode==='grid'?'GRID':'FREE')}
 resize(){const w=$('webgl').clientWidth||window.innerWidth,h=$('webgl').clientHeight||600,scale=(C.project.editor.quality==='low'?.6:C.project.editor.quality==='high'?1:.8);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();this.renderer.setSize(Math.max(320,Math.floor(w*scale)),Math.max(220,Math.floor(h*scale)),false)}
 refresh(){this.buildWorld();this.resetActors();this.checkRoom(true);this.resize()}
