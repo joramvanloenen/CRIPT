@@ -45,7 +45,7 @@ class Renderer{constructor(){this.domElement=el();this.outputColorSpace='';}
 class Texture{dispose(){}}
 class Spot extends Obj{constructor(){super();this.target=new Obj()}}
 const T={Scene:Obj,Group:Obj,PerspectiveCamera:Obj,WebGLRenderer:Renderer,HemisphereLight:Obj,PointLight:Obj,InstancedMesh:Obj,Mesh:Obj,MeshLambertMaterial:Material,MeshBasicMaterial:Material,MeshStandardMaterial:Material,ShaderMaterial:Material,SpotLight:Spot,DataTexture:Texture,Vector2:class{constructor(x,y){this.x=x;this.y=y}},
- BoxGeometry:Geometry,PlaneGeometry:Geometry,CylinderGeometry:Geometry,ConeGeometry:Geometry,IcosahedronGeometry:Geometry,ExtrudeGeometry:Geometry,Object3D:Obj,CanvasTexture:Texture,
+ BoxGeometry:Geometry,PlaneGeometry:Geometry,CylinderGeometry:Geometry,ConeGeometry:Geometry,IcosahedronGeometry:Geometry,DodecahedronGeometry:Geometry,TetrahedronGeometry:Geometry,ExtrudeGeometry:Geometry,Object3D:Obj,CanvasTexture:Texture,
  Shape,FogExp2:Fog,Color,SRGBColorSpace:1,NearestFilter:2,NearestMipmapNearestFilter:2,RepeatWrapping:3,DoubleSide:4,FrontSide:0,RGBAFormat:1023,UnsignedByteType:5121};
 const window={THREE:T,addEventListener(){}},localStorage={getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v)},performance={now:()=>0};
 const sandbox={window,document,localStorage,performance,Math,setTimeout,clearTimeout,requestAnimationFrame(){},console,confirm:()=>true,alert(){}};
@@ -73,6 +73,7 @@ assert.ok(shader.uniforms.criptGIAtlas===C.game.lighting.uniform,'Shared GI atla
 assert.ok(C.masonryStats.arches>20,'Masonry voussoirs not built');
 assert.ok(C.masonryStats.vaults>40,'Vault ceiling geometry not built');
 assert.ok(C.masonryStats.rubble>0,'Aged rubble missing');
+assert.ok(C.masonryStats.wallBaseDebris>25,'Wall and floor junctions need substantial stone fragments');
 assert.ok(C.Masonry.config(C.project.rooms['room-15']).height>7,'Boss chamber must have tall ceiling');
 const boss=C.project.rooms['room-15'],bossX=(boss.gx*9+4.5)*1.8,bossZ=(boss.gz*9+4.5)*1.8;
 assert.equal(C.Masonry.config(boss).archStyle,'pointed','Boss arches must have Gothic lancet profiles');
@@ -88,9 +89,10 @@ for(const type of ['rust','axe','cleaver','maul'])assert.ok(C.WeaponRig.create(C
 game.start();
 const startYaw=game.hero.yaw;
 game.alert();
-assert.equal(game.mode,'combat');
+assert.equal(game.mode,'free','Free movement must never switch to a grid/combat mode');
 game.keys.add('e');game.free(.2);game.keys.delete('e');
 assert.ok(game.hero.yaw>startYaw+.2,'Q/E continuous combat turning failed');
+assert.equal(game.hero.step,null,'No discrete movement step may be created');
 const afterHold=game.hero.yaw;
 game.turn(-1);assert.ok(game.hero.yaw<afterHold,'Tap turn during combat failed');
 game.strike(false);assert.ok(game.attackAnim&&!game.attackAnim.hit,'Weapon should wind up before impact');
@@ -137,6 +139,27 @@ assert.ok(game.attackAnim&&!game.attackAnim.hit,'Buffered strike should flow int
 assert.equal(game.queuedStrike,null,'Buffered input must be consumed exactly once');
 game.hero.weapon=sword;
 
+
+const gates=game.secretGates;
+assert.equal(gates.length,2,'Two secret entrances must lead to annexes');
+const first=gates[0],second=gates[1];
+game.hero.x=first.x-1.32;game.hero.z=first.z;game.hero.yaw=Math.PI/2;
+assert.ok(game.gateBlocks(first.x,first.z,.27),'Concealed door must initially block movement');
+assert.equal(game.nearest()?.id,first.id,'Hidden masonry should be interactable when approached facing it');
+game.interact();
+assert.ok(first.opening>0,'Interacting must start the hidden entrance animation');
+game.keys.clear();game.hero.vx=game.hero.vz=0;
+game.update(.85);
+assert.equal(first.open,true,'Secret doorway should open after sliding down');
+assert.equal(game.gateBlocks(first.x,first.z,.25),false,'Open gate must be traversable');
+assert.ok(game.gateBlocks(second.x,second.z,.25),'Opening one gate must not unlock another gate');
+assert.ok(game.can(first.x,first.z,.19),'Main gate opening must have free floor collision');
+assert.equal(game.seen.has('room-5'),false,'Treasure room remains undiscovered until entered');
+assert.ok(C.project.rooms['room-5'].props.some(o=>o.kind==='chest'),'Hidden annex must contain treasure');
+game.hero.x=first.x+1.2;game.hero.z=first.z;game.checkRoom();
+assert.equal(game.room.id,'room-5');
+assert.ok(game.seen.has('room-5'),'Visiting the hidden room should reveal it');
+
 const html=fs.readFileSync('index.html','utf8'),css=fs.readFileSync('style.css','utf8');
 assert.ok(html.indexOf('src="weapons.js"')<html.indexOf('src="game.js"'),'Weapon rig must load before engine');
 for(const key of ['q','e','w','a','s','d','f','attack','dodge','spell']){
@@ -145,4 +168,9 @@ for(const key of ['q','e','w','a','s','d','f','attack','dodge','spell']){
  assert.equal(m[1].replace(/<[^>]+>/g,'').trim(),'','Touch button '+key+' must not contain selectable text');
 }
 assert.ok(css.includes('-webkit-user-select:none!important')&&css.includes('touch-action:none!important'),'Touch controls must disable text selection and long press');
+assert.ok(html.includes('class="health-top"'),'Health must occupy a separate prominent top container');
+assert.ok(html.indexOf('id="hpFill"')<html.indexOf('class="hud-bottom"'),'HP meter must be above bottom bars');
+assert.ok(css.includes('#gameView .health-top .track'),'Health meter needs its own large style');
+assert.ok(!fs.readFileSync('game.js','utf8').includes("this.mode='grid'"),'Grid locomotion must be removed');
+
 console.log('PASS: 16 masonry rooms, bonded arches and vaults, repeated UVs, combat, weapon rig and touch controls');
