@@ -33,6 +33,17 @@ assert.ok(c.heightMap[0]<jointHeight,'Deeper configured mortar must lower the gr
 const rough=[];
 for(let i=0;i<a.roughness.length;i+=4)rough.push(a.roughness[i]);
 const min=Math.min(...rough),max=Math.max(...rough);
+
+const sample=(img,x,y)=>(img[(y*128+x)*4]+img[(y*128+x)*4+1]+img[(y*128+x)*4+2])/3;
+const mortarTone=sample(a.albedo,0,0),limestoneTone=sample(a.albedo,18,18);
+assert.ok(mortarTone>40,'Old charcoal-like grout must be replaced with believable lighter lime mortar');
+assert.ok(limestoneTone-mortarTone<115,'Mortar should no longer look like thick black outlines');
+const noGrout=M.build(stone,{size:128,cut:true});
+assert.ok(sample(noGrout.albedo,0,0)>mortarTone,'Separately modeled flagstones need no painted mortar');
+const flatStoneSamples=[];
+for(let i=0;i<noGrout.heightMap.length;i+=67)flatStoneSamples.push(noGrout.heightMap[i]);
+assert.ok(Math.max(...flatStoneSamples)-Math.min(...flatStoneSamples)>.012,'Cut stone must retain face micro-relief');
+
 assert.ok(max-min>26,'Stone smoothness map must visibly vary under specular lighting');
 const wet={...stone,materialRecipe:{...M.recipeFor(stone),wetness:1,polish:.75}};
 const glossy=M.build(wet,{size:128});
