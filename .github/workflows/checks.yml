@@ -16,6 +16,7 @@ jobs:
           node --check data.js
           node --check weapons.js
           node --check mesh-forge.js
+          node --check mesh-vision.js
           node --check procedural-stone.js
           node --check architecture.js
           node --check lighting-bake-worker.js
@@ -23,12 +24,15 @@ jobs:
           node --check game.js
           node --check editor.js
           node --check mesh-workshop.js
+          node --check mesh-vision-workshop.js
+          node --check tools/png.cjs
           node --check tools/mesh-agent.cjs
           node --check audio.js
       - name: Check content
         run: |
           node tests/mesh.test.cjs
-          node tools/mesh-agent.cjs --all --out generated-models --iterations 12
+          node tests/visual.test.cjs
+          node tools/mesh-agent.cjs --all --out generated-models --iterations 3 --size 64
           node tests/world.test.cjs
           node tests/materials.test.cjs
           node tests/lighting.test.cjs
