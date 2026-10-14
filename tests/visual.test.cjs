@@ -1,0 +1,40 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const window={};
+const context={window,Math,Uint8Array,Uint8ClampedArray,Float32Array,console};
+vm.runInNewContext(fs.readFileSync('mesh-forge.js','utf8'),context,{filename:'mesh-forge.js'});
+vm.runInNewContext(fs.readFileSync('mesh-vision.js','utf8'),context,{filename:'mesh-vision.js'});
+const F=window.Cript.MeshForge,V=window.Cript.MeshVision;
+const recipe=F.presets.urn;
+const target={...recipe,width:1.31,height:1.61,segments:32};
+const refs=V.targetFromRecipe(target,{size:56});
+assert.deepEqual(Object.keys(refs),['front','side','iso']);
+for(const view of V.VIEWS){
+ const a=V.render(F.build(recipe),view,56),b=V.render(F.build(recipe),view,56);
+ assert.deepEqual([...a.mask],[...b.mask],view+' deterministic silhouette');
+ assert.ok(V.coverage(a).pixels>100,view+' must have non-empty raster');
+ assert.equal(V.compare(a,b).iou,1,'identical mesh silhouette should overlap exactly');
+}
+const baseline=V.evaluate(recipe,refs,{size:56});
+const result=V.refine(recipe,refs,{size:56,iterations:3});
+assert.ok(result.valid&&result.report.valid,'visual optimization must preserve manifold topology');
+assert.ok(result.score>baseline.score+.04,'target-directed optimization should visibly improve similarity');
+assert.ok(result.accepted>0&&result.history.some(h=>h.key==='width'),'optimizer must make targeted dimension changes');
+assert.equal(recipe.width,1,'original source recipe must not be mutated');
+assert.equal(result.score,V.evaluate(result.recipe,refs,{size:56}).score,'best score must match rendered candidate');
+const almost=V.evaluate({...recipe,width:1.21},refs,{size:56});
+assert.ok(almost.score>baseline.score,'reference matching must reward width moving toward target');
+const rgba=new Uint8ClampedArray(32*32*4);
+for(let y=6;y<26;y++)for(let x=9;x<23;x++){const i=(y*32+x)*4;rgba[i]=170;rgba[i+1]=210;rgba[i+2]=240;rgba[i+3]=255;}
+const imported=V.maskFromRGBA(rgba,32,32,{size:56});
+assert.ok(V.coverage(imported).pixels>100&&V.coverage(imported).pixels<56*56,'alpha PNG import mask should preserve silhouette');
+const pixel=V.colorPixels(V.render(F.build(recipe),'front',56),refs.front);
+assert.equal(pixel.length,56*56*4,'difference preview should contain full RGBA pixels');
+const P=require('../tools/png.cjs');
+const data=P.encode(32,32,rgba),back=P.decode(data);
+assert.equal(back.width,32);assert.equal(back.height,32);
+assert.deepEqual([...back.rgba],[...rgba],'PNG encode/decode roundtrip should preserve transparency and colors');
+const html=fs.readFileSync('index.html','utf8');
+assert.ok(html.indexOf('src="mesh-forge.js"')<html.indexOf('src="mesh-vision.js"')&&
+ html.indexOf('src="mesh-vision.js"')<html.indexOf('src="data.js"'),'visual engine needs mesh kernel before project');
+assert.ok(html.includes('src="mesh-vision-workshop.js"'),'integrated visual workshop missing');
+console.log('PASS: orthographic raster, silhouette targets, iterative improvement, PNG reference mask, RGB diff and UI script integration');
