@@ -180,7 +180,7 @@ assert.equal(game.room.id,'room-5');
 assert.ok(game.seen.has('room-5'),'Visiting the hidden room should reveal it');
 
 const html=fs.readFileSync('index.html','utf8'),css=fs.readFileSync('style.css','utf8');
-assert.ok(html.indexOf('src="weapons.js?v=gothic02"')<html.indexOf('src="game.js?v=gothic02"'),'Weapon rig must load before engine');
+assert.ok(html.indexOf('src="weapons.js?v=stone03"')<html.indexOf('src="game.js?v=stone03"'),'Weapon rig must load before engine');
 for(const key of ['q','e','w','a','s','d','f','attack','dodge','spell']){
  const m=html.match(new RegExp('<button[^>]*data-touch="'+key+'"[^>]*>([\\s\\S]*?)<\\/button>'));
  assert.ok(m&&m[1].includes('<svg'),'Touch button '+key+' must use a vector icon');
