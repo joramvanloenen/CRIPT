@@ -92,7 +92,7 @@ game.alert();
 assert.equal(game.mode,'free','Free movement must never switch to a grid/combat mode');
 game.keys.add('e');game.free(.2);game.keys.delete('e');
 assert.ok(game.hero.yaw>startYaw+.2,'Q/E continuous combat turning failed');
-assert.equal(game.hero.step,null,'No discrete movement step may be created');
+assert.equal(Object.hasOwn(game.hero,'step'),false,'Grid-step state must no longer exist');
 const afterHold=game.hero.yaw;
 game.turn(-1);assert.ok(game.hero.yaw<afterHold,'Tap turn during combat failed');
 game.strike(false);assert.ok(game.attackAnim&&!game.attackAnim.hit,'Weapon should wind up before impact');
