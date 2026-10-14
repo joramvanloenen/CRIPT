@@ -101,9 +101,16 @@ function evaluate(recipe,targets,{size=72,views=VIEWS}={}){
 function parameters(recipe){
  const t=recipe.type||'ashlar';
  if(t==='column')return ['height','radius','fluteDepth','segments'];
- if(t==='urn'||t==='bell')return ['width','height','segments'];
+ if(t==='urn'||t==='bell'){
+  const profile=recipe.latheProfile||F.latheProfiles?.[t]||[];
+  // Permit local shoulder, lip and rim reshaping rather than just scaling a pot.
+  return ['width','height',...profile.slice(1,Math.min(8,profile.length-1)).map((_,i)=>'latheR:'+String(i+1))];
+ }
  if(t==='rib')return ['span','rise','thickness'];
- if(t==='profile'||t==='voussoir')return ['depth','bevel','outlineX','outlineY'];
+ if(t==='profile'||t==='voussoir'){
+  const points=recipe.outline||[];
+  return['depth','bevel','outlineX','outlineY',...points.slice(0,Math.min(16,points.length)).flatMap((_,i)=>['outline:'+i+':0','outline:'+i+':1'])];
+ }
  if(t==='sarcophagus')return ['width','height','depth','erosion'];
  return['width','height','depth','bevel','erosion'];
 }
@@ -112,6 +119,22 @@ const LIMITS={width:[.16,8],height:[.15,12],depth:[.10,8],radius:[.08,2.5],rise:
  outlineX:[.45,2.0],outlineY:[.45,2.0]};
 function change(recipe,key,direction,factor){
  const next={...recipe};
+ if(key.startsWith('latheR:')){
+  const point=Number(key.slice(7)),orig=recipe.latheProfile||F.latheProfiles?.[recipe.type];
+  if(!orig||!orig[point])return null;
+  const section=orig.map(p=>p.slice());
+  section[point][0]=+clamp(section[point][0]*(1+direction*factor),.015,2).toFixed(5);
+  next.latheProfile=section;return next;
+ }
+ if(key.startsWith('outline:')){
+  const [,index,axis]=key.split(':'),k=Number(index),a=Number(axis),orig=recipe.outline;
+  if(!orig||!orig[k])return null;
+  const section=orig.map(p=>p.slice());
+  const coords=section.map(p=>p[a]),span=Math.max(.001,Math.max(...coords)-Math.min(...coords));
+  section[k][a]=+(section[k][a]+direction*factor*span*.27).toFixed(5);
+  next.outline=section;return next;
+ }
+
  if(key==='outlineX'||key==='outlineY'){
   if(!Array.isArray(next.outline))return null;
   const axis=key==='outlineX'?0:1,pts=next.outline;
@@ -221,7 +244,15 @@ const typeStyles={
 };
 function artRecipe(recipe){
  const patch=targetStyles[recipe.id]||typeStyles[recipe.type]||{};
- return{...recipe,...patch,name:(recipe.name||recipe.type)+' / ART TARGET'};
+ const target={...recipe,...patch,name:(recipe.name||recipe.type)+' / ART TARGET'};
+ if(recipe.id==='urn'||recipe.id==='bell'){
+  const sections=(recipe.latheProfile||F.latheProfiles[recipe.type]).map(p=>p.slice());
+  // Manually art-directed shoulder and neck changes affect actual curvature.
+  if(recipe.type==='urn'){sections[3][0]*=1.12;sections[4][0]*=1.10;sections[6][0]*=.94;}
+  else{sections[2][0]*=1.05;sections[4][0]*=1.1;sections[6][0]*=.91;}
+  target.latheProfile=sections;
+ }
+ return target;
 }
 C.MeshVision={VIEWS,render,coverage,compare,evaluate,targetFromRecipe,refine,change,colorPixels,maskFromRGBA,artRecipe,targetStyles};
 })();
