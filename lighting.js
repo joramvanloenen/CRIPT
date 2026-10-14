@@ -22,7 +22,7 @@ class BakedLighting{
   t.generateMipmaps=false;t.flipY=false;t.needsUpdate=true;return t;
  }
  attach(material){
-  if(!material||!material.isMeshStandardMaterial&&!material.userData)return;
+  if(!material?.isMeshStandardMaterial)return;
   if(material.userData?.criptBakedGI)return;
   material.userData=material.userData||{};material.userData.criptBakedGI=true;
   const prev=material.onBeforeCompile,gi=this.uniform;
