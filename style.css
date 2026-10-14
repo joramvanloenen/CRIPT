@@ -82,3 +82,16 @@
 .forge-report{font:11px/1.5 ui-monospace,monospace;color:#c8d0b3;background:#1c2d2e;border:1px solid #536b63;padding:9px}
 .forge-recipe{display:block;min-height:150px;width:100%;resize:vertical;background:#0b1618;color:#bad6c9;border:1px solid #46625d;font:11px/1.35 monospace;padding:8px}
 @media(max-width:800px){.forge-toolbar{font-size:9px;right:10px;white-space:normal}.forge-status{font-size:9px;right:10px}}
+
+
+/* Visual critique: target red/cyan silhouette difference viewer */
+.forge-vision-panel{margin-top:14px;padding-top:13px;border-top:1px solid #5e766d;}
+.forge-vision-panel h3{margin:8px 0 9px;letter-spacing:.13em;}
+.forge-vision-description{color:#93aea5;font-size:11px;line-height:1.5;margin:6px 0 10px;}
+.forge-vision-score{font:600 22px/1.2 ui-monospace,Consolas,monospace;color:#f4d49b;margin:11px 0;}
+.forge-vision-views{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;overflow:hidden;margin:10px 0 12px;}
+.forge-vision-view{min-width:0;display:flex;flex-direction:column;gap:4px;align-items:center;}
+.forge-vision-view canvas{width:100%;height:auto;aspect-ratio:1;image-rendering:pixelated;border:1px solid #425956;background:#101d1f;max-width:108px;}
+.forge-vision-view small{color:#a9bbb2;font:10px/1.4 ui-monospace,monospace;}
+.forge-vision-panel button{display:block;margin:7px 0;max-width:100%;}
+.forge-vision-panel .forge-target-file{display:block;max-width:100%;margin:9px 0;color:#acbdb6;font-size:11px;}
