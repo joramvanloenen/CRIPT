@@ -48,49 +48,23 @@ class Masonry{
   this.world=world;this.project=project;this.texture=texture;this.geom=new Map();
   this.mats=new Map();this.rooms=new Map();this.colliders=[];this.count={blocks:0,arches:0,vaults:0,rubble:0,rooms:0};
   this.unit=new T.Object3D();
-  this.normalMaps=[];
+  this.surfaceTextures=[];
   for(const [id,asset]of Object.entries(project.assets.textures)){
-   const map=texture(asset);
-   map.wrapS=map.wrapT=T.RepeatWrapping;
-   const normalMap=this.makeNormalMap(asset);
-   this.mats.set(id,new T.MeshStandardMaterial({
-    map,normalMap,roughness:id==='moss'?.99:.91,metalness:0,color:0xffffff,
-    side:T.FrontSide,flatShading:false
-   }));
+   const quality=project.editor?.quality||'medium';
+   if(!C.StoneMaterials)throw Error('Procedural stone generator not loaded');
+   for(const cut of [false,true]){
+    const surface=C.StoneMaterials.textures(T,asset,{quality,cut});
+    this.surfaceTextures.push(surface.diffuse,surface.normal,surface.roughness);
+    this.mats.set(cut?id+':cut':id,new T.MeshStandardMaterial({
+     map:surface.diffuse,normalMap:surface.normal,roughnessMap:surface.roughness,
+     normalScale:new T.Vector2(cut?.48:.95,cut?.48:.95),
+     roughness:1,metalness:0,color:0xffffff,side:T.FrontSide
+    }));
+   }
   }
   for(const [id,color]of Object.entries({mortar:0x192525,shadow:0x101d1c,trim:0x889187,ivory:0xbeb99f,soot:0x343c38,iron:0x514b42,wood:0x564b38,lichen:0x4b7561,gold:0xb59a70,glass:0x98d6b9,light:0xcddcc0,water:0x2c645d})){
    this.mats.set(id,new T.MeshLambertMaterial({color,side:T.DoubleSide}));
   }
- }
- makeNormalMap(asset){
-  if(!asset?.pixels||typeof document==='undefined'||this.project.editor?.quality==='low')return null;
-  const canvas=document.createElement('canvas');
-  const ctx=canvas.getContext?.('2d');
-  if(!ctx?.createImageData||!ctx.putImageData)return null;
-  const width=asset.width||32,height=asset.height||width;
-  canvas.width=width;canvas.height=height;
-  const heights=new Float32Array(width*height);
-  for(let i=0;i<heights.length;i++){
-   const c=asset.pixels[i]||'#303030',hex=c[0]==='#'?c.slice(1):'303030';
-   const v=parseInt(hex,16)||0;
-   heights[i]=(.2126*((v>>16)&255)+.7152*((v>>8)&255)+.0722*(v&255))/255;
-  }
-  const pixels=ctx.createImageData(width,height);
-  const sample=(x,y)=>heights[((y+height)%height)*width+((x+width)%width)];
-  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
-   const dx=(sample(x+1,y)-sample(x-1,y))*2.2;
-   const dy=(sample(x,y+1)-sample(x,y-1))*2.2;
-   const inv=1/Math.hypot(dx,dy,1),i=(y*width+x)*4;
-   pixels.data[i]=Math.round(128-dx*inv*127);
-   pixels.data[i+1]=Math.round(128+dy*inv*127);
-   pixels.data[i+2]=Math.round(128+inv*127);
-   pixels.data[i+3]=255;
-  }
-  ctx.putImageData(pixels,0,0);
-  const tex=new T.CanvasTexture(canvas);
-  tex.wrapS=tex.wrapT=T.RepeatWrapping;
-  tex.minFilter=tex.magFilter=T.NearestFilter;
-  this.normalMaps.push(tex);return tex;
  }
  geometry(w,h,d){
   const key=[w,h,d].map(v=>v.toFixed(2)).join(':');
@@ -159,62 +133,41 @@ class Masonry{
  }
  tile(room,x,z){return room.tiles[z*9+x]}
  ground(room,x,z,mat){
-  const [px,pz]=this.xz(room,x,z),split=hash(x,z,room.gx*7+room.gz)> .67?2:1,sz=S/split;
-  for(let i=0;i<split;i++)for(let j=0;j<split;j++){
-   const left=px-S/2+sz*(i+.5),back=pz-S/2+sz*(j+.5);
-   const noise=hash(x*8+i,z*8+j,room.gx+11*room.gz);
-   this.box(room,mat,left,-.075+noise*.018,back,sz-.035,.19,sz-.035,0,0,this.tint(room,left,0,back));
-   if(noise>.94&&room.decay>.36){
-    this.box(room,'mortar',left-.13,.029,back,.025,.008,.52,noise*.36);
-   }
+  const [cx,cz]=this.xz(room,x,z),erosion=Number.isFinite(room.decay)?room.decay:.3;
+  // Continual flagstone UVs describe joints while a few chipped pieces break silhouette.
+  this.box(room,mat,cx,-.095,cz,S-.018,.19,S-.018,0,0,this.tint(room,x,0,z));
+  const n=hash(x*7,z*9,room.gx*9+room.gz);
+  if(n<erosion*.22){
+   const shift=(n-.5)*.26;
+   this.box(room,mat+':cut',cx+shift,.025,cz-.29,.76,.055,.63,n*.1,0,this.tint(room,x,0,z));
   }
  }
  courseWall(room,x,z,dir,height,decay){
   const mat=this.palette(room),[cx,cz]=this.xz(room,x,z);
   const dx=dir==='E'?1:dir==='W'?-1:0,dz=dir==='S'?1:dir==='N'?-1:0;
   const eastWest=dx!==0;
-  const normalOffset=S*.5-.115;
-  const fx=cx+dx*normalOffset,fz=cz+dz*normalOffset;
-  const courses=Math.max(7,Math.round(height/.45)),courseH=height/courses;
-  // Recessed continuous rubble core stops missing facing stones opening a hole.
-  this.box(room,'mortar',fx-dx*.16,height/2,fz-dz*.16,eastWest?.13:S,height,eastWest?S:.13);
-  const patterns=[
-   [.9,.9],              // normal bonded blocks
-   [.45,.9,.45],         // central long stone / two short springers
-   [.6,.6,.6],           // one-third bond
-   [.45,.45,.9]          // alternating smaller facing stones
-  ];
-  for(let row=0;row<courses;row++){
-   const y=row*courseH+courseH*.5;
-   const pattern=patterns[Math.floor(hash(x*17+row*5,z*9+row*2,room.gz*7+room.gx*3)*patterns.length)];
-   let from=-S/2;
-   for(let i=0;i<pattern.length;i++){
-    const width=pattern[i], n=hash(x*19+row*3,z*11+i*9,room.gx*7+room.gz*17);
-    const chip=hash(x*4+row*13,z*7+i*17,room.gz*5);
-    const show=chip>decay*.085 || row===0;
-    if(show){
-     const depth=n>.64?.31:n>.22?.27:.23;
-     const c=from+width/2,offset=depth*.08;
-     const px=fx+(eastWest?dx*offset:c),pz=fz+(eastWest?c:dz*offset);
-     const w=Math.max(.1,width-.028);
-     this.box(room,mat,px,y,pz,eastWest?depth:w,courseH-.022,eastWest?w:depth,0,0,this.tint(room,x+row*.3,y,z+from));
-     if(chip<decay*.17&&row>1){
-      this.box(room,'soot',px,y+courseH*.35,pz,eastWest?.03:.11,.027,eastWest?.11:.03);
-     }
-    }
-    from+=width;
-   }
+  const fx=cx+dx*(S*.5-.10),fz=cz+dz*(S*.5-.10);
+  // One tall wall panel with a mathematical ashlar bond; no UV stretching
+  // and no costly wall of individually drawn cubes.
+  this.box(room,mat,fx,height/2,fz,eastWest?.22:S,height,eastWest?S:.22,0,0);
+  const sparse=hash(x*17,z*13,room.gx*19+room.gz*23);
+  if(sparse<.26+decay*.20){
+   const rows=Math.max(3,Math.floor(height/.66));
+   const y=(1+Math.floor(hash(x,z,45)*(rows-1)))*(height/rows);
+   const offset=hash(x*13,z*19,13)>.5?-.44:.44;
+   const xx=fx+(eastWest?dx*.12:offset),zz=fz+(eastWest?offset:dz*.12);
+   this.box(room,mat+':cut',xx,y,zz,eastWest?.11:.64,.39,eastWest?.64:.11,0,(hash(x,z,64)-.5)*.09,this.tint(room,x,y,z));
   }
-  // Projecting corbel courses and compact buttresses receive the vault thrust.
+  // Quoins and heavy buttresses remain modeled stone for strong silhouettes.
   if((x+z)%3===0){
    const px=cx+dx*(S*.47),pz=cz+dz*(S*.47);
-   this.box(room,mat,px,.25,pz,eastWest?.37:.53,.5,eastWest?.53:.37,0,0,this.tint(room,x,0,z));
-   this.box(room,mat,px,height*.54,pz,eastWest?.22:.32,height*.66,eastWest?.32:.22,0,0);
-   this.box(room,'trim',px,height-.18,pz,eastWest?.42:.53,.23,eastWest?.53:.42);
+   this.box(room,mat+':cut',px,.24,pz,eastWest?.38:.53,.48,eastWest?.53:.38,0,0,this.tint(room,x,0,z));
+   this.box(room,mat+':cut',px,height*.54,pz,eastWest?.23:.33,height*.67,eastWest?.33:.23);
+   this.box(room,'trim',px,height-.18,pz,eastWest?.44:.54,.23,eastWest?.54:.44);
   }
  }
  pier(room,x,z,height){
-  const [cx,cz]=this.xz(room,x,z),mat=this.palette(room),n=room.decay;
+  const [cx,cz]=this.xz(room,x,z),mat=this.palette(room)+':cut',n=room.decay;
   for(let y=.3;y<height;y+=.52){
    this.box(room,mat,cx,y,cz,.82,Math.min(.5,height-y+.2),.82,0,0,this.tint(room,x,y,z));
   }
@@ -224,7 +177,7 @@ class Masonry{
   if(n>.4){this.box(room,'soot',cx+.42,1.1,cz+.14,.017,.45,.065,0,-.22)}
  }
  arch(room,cx,cz,yaw=0,scale=1,base=2.04,material=null){
-  const mat=material||this.palette(room),r=.87*scale,outer=1.16*scale,segments=11;
+  const mat=(material||this.palette(room))+':cut',r=.87*scale,outer=1.16*scale,segments=11;
   const style=config(room).archStyle;
   // Left and right springers rest on square piers; the key stone locks the arch.
   const side=x=>{const xx=cx+Math.cos(yaw)*x,zz=cz-Math.sin(yaw)*x;
@@ -425,7 +378,7 @@ class Masonry{
     const xx=px+(rnd-.5)*1.15,zz=pz+(hash(x,k,z*3)-.5)*1.1;
     const rubbleSizes=[[.17,.08,.22],[.28,.13,.26],[.38,.18,.35],[.25,.10,.44]];
     const [w,h,d]=rubbleSizes[Math.floor(rnd*rubbleSizes.length)];
-    this.box(room,rnd>.8?'trim':mat,xx,h/2+.03,zz,w,h,d,0,(rnd-.5)*.56,this.tint(room,xx,h,zz));this.count.rubble++;
+    this.box(room,rnd>.8?'trim':mat+':cut',xx,h/2+.03,zz,w,h,d,0,(rnd-.5)*.56,this.tint(room,xx,h,zz));this.count.rubble++;
    }
   }
   // Soot blooms and moss at the base of exposed masonry are age-dependent.
@@ -484,7 +437,7 @@ class Masonry{
  dispose(){
   for(const geometry of this.geom.values())geometry.dispose?.();
   for(const mat of this.mats.values())mat.dispose?.();
-  for(const tex of this.normalMaps)tex.dispose?.();
+  for(const tex of this.surfaceTextures)tex.dispose?.();this.surfaceTextures.length=0;
   this.geom.clear();this.mats.clear();this.rooms.clear();
  }
  floorHeightAt(x,z){
