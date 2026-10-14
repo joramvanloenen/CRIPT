@@ -76,7 +76,7 @@ editor.renderInspector=function(){
    editor.checkpoint();
    const selected=C.MeshForge.curated[asset.id];
    const name=asset.name,id=asset.id;
-   Object.assign(asset,structuredClone(selected),{id,name,artPass:'gothic-01'});
+   Object.assign(asset,C.copy(selected),{id,name,artPass:'gothic-01'});
    editor.change();
   });
  }
