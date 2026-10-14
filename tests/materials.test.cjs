@@ -29,4 +29,14 @@ const modified={...stone,materialRecipe:{...M.recipeFor(stone),depth:1.25,seed:1
 const c=M.build(modified,opts);
 assert.notDeepEqual([...a.albedo.slice(0,256)],[...c.albedo.slice(0,256)],'Editor controls must change material output');
 assert.ok(c.heightMap[0]<jointHeight,'Deeper configured mortar must lower the grooves');
-console.log('PASS: deterministic layered masonry; grout depth; height-based normals; floor pattern; editor overrides; clean cut stones');
+
+const rough=[];
+for(let i=0;i<a.roughness.length;i+=4)rough.push(a.roughness[i]);
+const min=Math.min(...rough),max=Math.max(...rough);
+assert.ok(max-min>26,'Stone smoothness map must visibly vary under specular lighting');
+const wet={...stone,materialRecipe:{...M.recipeFor(stone),wetness:1,polish:.75}};
+const glossy=M.build(wet,{size:128});
+const wetRough=Array.from(glossy.roughness).filter((_,i)=>i%4===0);
+assert.ok(Math.min(...wetRough)<min,'Wet polished stone must develop lower roughness and sharper reflections');
+assert.ok(Math.max(...wetRough)>230,'Mortar remains rough even in a wet stone material');
+console.log('PASS: deterministic masonry normals, mortar depth, wet smoothness highlights, and rough joints');
