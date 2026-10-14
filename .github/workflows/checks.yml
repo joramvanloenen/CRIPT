@@ -23,11 +23,20 @@ jobs:
           node --check game.js
           node --check editor.js
           node --check mesh-workshop.js
+          node --check tools/mesh-agent.cjs
           node --check audio.js
       - name: Check content
         run: |
           node tests/mesh.test.cjs
+          node tools/mesh-agent.cjs --all --out generated-models --iterations 12
           node tests/world.test.cjs
           node tests/materials.test.cjs
           node tests/lighting.test.cjs
           node tests/game.test.cjs
+      - name: Save AI review meshes and views
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crypt-mesh-review
+          path: generated-models/
+          if-no-files-found: ignore
