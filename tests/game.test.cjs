@@ -36,19 +36,20 @@ class Geometry extends Obj{
  getAttribute(k){return this.attributes[k]}
  translate(){return this}
 }
-class Material extends Obj{clone(){return new Material()}}
+class Material extends Obj{constructor(){super();this.isMeshStandardMaterial=true}clone(){return new Material()}}
 class Color{set(){return this}setRGB(){return this}multiplyScalar(){return this}}
 class Fog extends Obj{constructor(){super();this.color=new Color();this.density=.06}}
 class Shape{moveTo(){}lineTo(){}closePath(){}}
 class Renderer{constructor(){this.domElement=el();this.outputColorSpace='';}
  setPixelRatio(){}setSize(){}render(){}}
 class Texture{dispose(){}}
-const T={Scene:Obj,Group:Obj,PerspectiveCamera:Obj,WebGLRenderer:Renderer,HemisphereLight:Obj,PointLight:Obj,InstancedMesh:Obj,Mesh:Obj,MeshLambertMaterial:Material,MeshBasicMaterial:Material,MeshStandardMaterial:Material,DataTexture:Texture,Vector2:class{constructor(x,y){this.x=x;this.y=y}},
+class Spot extends Obj{constructor(){super();this.target=new Obj()}}
+const T={Scene:Obj,Group:Obj,PerspectiveCamera:Obj,WebGLRenderer:Renderer,HemisphereLight:Obj,PointLight:Obj,InstancedMesh:Obj,Mesh:Obj,MeshLambertMaterial:Material,MeshBasicMaterial:Material,MeshStandardMaterial:Material,ShaderMaterial:Material,SpotLight:Spot,DataTexture:Texture,Vector2:class{constructor(x,y){this.x=x;this.y=y}},
  BoxGeometry:Geometry,PlaneGeometry:Geometry,CylinderGeometry:Geometry,ConeGeometry:Geometry,IcosahedronGeometry:Geometry,ExtrudeGeometry:Geometry,Object3D:Obj,CanvasTexture:Texture,
  Shape,FogExp2:Fog,Color,SRGBColorSpace:1,NearestFilter:2,NearestMipmapNearestFilter:2,RepeatWrapping:3,DoubleSide:4,FrontSide:0,RGBAFormat:1023,UnsignedByteType:5121};
 const window={THREE:T,addEventListener(){}},localStorage={getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v)},performance={now:()=>0};
 const sandbox={window,document,localStorage,performance,Math,setTimeout,clearTimeout,requestAnimationFrame(){},console,confirm:()=>true,alert(){}};
-for(const file of ['data.js','weapons.js','procedural-stone.js','architecture.js','game.js']){
+for(const file of ['data.js','weapons.js','procedural-stone.js','architecture.js','lighting-bake-worker.js','lighting.js','game.js']){
  vm.runInNewContext(fs.readFileSync(file,'utf8'),sandbox,{filename:file});
 }
 const C=window.Cript,game=C.game;
