@@ -52,3 +52,22 @@
   #gameView .touchpad button{min-width:38px;min-height:39px;padding:7px}
   #gameView .touchpad svg{width:22px;height:22px}
 }
+
+
+/* Combat HUD: one readable health meter anchored above the scene. */
+#gameView .hud-top{position:relative;min-height:92px;justify-content:flex-start;align-items:flex-start}
+#gameView .health-top{position:absolute;left:50%;top:14px;transform:translateX(-50%);width:clamp(260px,36vw,510px);max-width:68%;background:linear-gradient(180deg,#101716c7,#060b0ace);padding:8px 13px 12px;border:1px solid #5a5a4e8a;border-radius:5px;box-shadow:0 9px 24px #0007}
+#gameView .health-top label{display:flex;justify-content:space-between;align-items:center;font:700 12px/1.1 ui-monospace,Consolas,monospace;letter-spacing:.16em;color:#e4d8c5}
+#gameView .health-top label b{color:#f5e7d5;font-size:13px;letter-spacing:0}
+#gameView .health-top .track{margin-top:9px;height:17px;padding:2px;background:#0c0d0dbf;border:1px solid #84695f;box-shadow:inset 0 2px 5px #0008;overflow:hidden}
+#gameView .health-top .track i.hp{background:linear-gradient(180deg,#d87260,#a53b3b);box-shadow:0 0 12px #ae554588;transition:width .18s ease-out}
+#gameView .hud-bottom .resources>div{width:clamp(100px,12vw,155px)}
+#gameView .hud-bottom .resources .track{height:9px}
+@media(max-width:800px){
+ #gameView .hud-top{min-height:99px}
+ #gameView .health-top{top:10px;width:clamp(204px,75vw,390px);max-width:calc(100vw - 38px);padding:7px 12px 11px}
+ #gameView .health-top .track{height:16px;margin-top:7px}
+ #gameView .hud-top .zone{position:absolute;left:12px;top:82px}
+ #gameView .hud-top .zone strong{font-size:9px;letter-spacing:.10em}
+ #gameView .hud-bottom .resources>div{width:clamp(70px,19vw,110px)}
+}
