@@ -46,7 +46,7 @@ function materialSurface(geo){
 class Masonry{
  constructor(world,project,texture){
   this.world=world;this.project=project;this.texture=texture;this.geom=new Map();
-  this.mats=new Map();this.rooms=new Map();this.colliders=[];this.count={blocks:0,arches:0,vaults:0,rubble:0,rooms:0};
+  this.mats=new Map();this.rooms=new Map();this.colliders=[];this.count={blocks:0,arches:0,vaults:0,rubble:0,wallBaseDebris:0,rooms:0};
   this.unit=new T.Object3D();
   this.surfaceTextures=[];
   for(const [id,asset]of Object.entries(project.assets.textures)){
@@ -109,10 +109,10 @@ class Masonry{
   if(!this.rooms.has(room.id)){const group=new T.Group();group.name='Masonry / '+room.name;this.world.add(group);this.rooms.set(room.id,{group,buckets:new Map(),room});this.count.rooms++}
   return this.rooms.get(room.id);
  }
- instance(room,matId,geoKey,geometry,x,y,z,rx=0,ry=0,rz=0,color=null){
+ instance(room,matId,geoKey,geometry,x,y,z,rx=0,ry=0,rz=0,color=null,scale=null){
   const store=this.roomStore(room),key=matId+'|'+geoKey;
   if(!store.buckets.has(key))store.buckets.set(key,{geometry,material:this.mats.get(matId)||this.mats.get('trim'),instances:[]});
-  store.buckets.get(key).instances.push({x,y,z,rx,ry,rz,color});
+  store.buckets.get(key).instances.push({x,y,z,rx,ry,rz,color,scale});
  }
  box(room,material,x,y,z,w,h,d,rotationY=0,rotationZ=0,color=null){
   if(w<=0||h<=0||d<=0)return;
@@ -142,6 +142,36 @@ class Masonry{
    this.box(room,mat+':cut',cx+shift,.025,cz-.29,.76,.055,.63,n*.1,0,this.tint(room,x,0,z));
   }
  }
+ wallBaseDebris(room,x,z,dir,decay){
+  const mat=this.palette(room)+':cut',[cx,cz]=this.xz(room,x,z);
+  const dx=dir==='E'?1:dir==='W'?-1:0,dz=dir==='S'?1:dir==='N'?-1:0;
+  // The debris follows a genuine wall/floor contact line. Blocks are carried
+  // outward from the wall, leaving the walkable middle of corridors clear.
+  const alongX=dz!==0,amount=2+Math.floor(decay*6);
+  for(let i=0;i<amount;i++){
+   const n=hash(cx+i*3.9,cz+i*8.7,room.gx*37+room.gz*13);
+   if(n>.61+decay*.22)continue;
+   const along=(i+.38+n*.34)/amount*1.65-.82;
+   const inset=.94+hash(x+i*4,z+i*3,79)*.28;
+   const px=cx+dx*inset+(alongX?along:0);
+   const pz=cz+dz*inset+(alongX?0:along);
+   const size=.12+n*.32;
+   const h=.05+hash(i,x,z)*.15;
+   const kind=hash(x*15+i,z*7+i,91)>.33?'rock:dodeca':'rock:tetra';
+   if(!this.geom.has(kind)){
+    const geo=kind==='rock:dodeca'?new T.DodecahedronGeometry(.5,0):new T.TetrahedronGeometry(.5,0);
+    this.geom.set(kind,geo);
+   }
+   this.instance(room,mat,kind,this.geom.get(kind),px,h*.61,pz,
+    n*.22,hash(i,z,x)*6.283,n*.33,this.tint(room,px,h,pz),
+    [size*2,h*2,size*(1.25+n*.85)]);
+   this.count.wallBaseDebris++;
+   // Thin fines that collect in the last centimeters of the wall.
+   if(i%3===0){
+    this.box(room,'soot',px+dx*.08,.014,pz+dz*.08,size*.93,.018,size*.76,0,n*.4);
+   }
+  }
+ }
  courseWall(room,x,z,dir,height,decay){
   const mat=this.palette(room),[cx,cz]=this.xz(room,x,z);
   const dx=dir==='E'?1:dir==='W'?-1:0,dz=dir==='S'?1:dir==='N'?-1:0;
@@ -165,6 +195,7 @@ class Masonry{
    this.box(room,mat+':cut',px,height*.54,pz,eastWest?.23:.33,height*.67,eastWest?.33:.23);
    this.box(room,'trim',px,height-.18,pz,eastWest?.44:.54,.23,eastWest?.54:.44);
   }
+  this.wallBaseDebris(room,x,z,dir,decay);
  }
  pier(room,x,z,height){
   const [cx,cz]=this.xz(room,x,z),mat=this.palette(room)+':cut',n=room.decay;
@@ -425,7 +456,7 @@ class Masonry{
     bucket.instances.forEach((p,i)=>{
      this.unit.position.set(p.x,p.y,p.z);
      this.unit.rotation.set(p.rx,p.ry,p.rz);
-     this.unit.scale.set(1,1,1);
+     this.unit.scale.set(p.scale?.[0]||1,p.scale?.[1]||1,p.scale?.[2]||1);
      this.unit.updateMatrix();
      mesh.setMatrixAt(i,this.unit.matrix);
      if(p.color&&mesh.setColorAt)mesh.setColorAt(i,p.color);
