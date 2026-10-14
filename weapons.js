@@ -77,40 +77,182 @@ function makeWeapon(def){
   for(const x of [-.43,.43]){const spike=new T.Mesh(new T.ConeGeometry(.12,.22,5),edge);spike.rotation.z=x<0?Math.PI/2:-Math.PI/2;spike.position.set(x+(x<0?-.12:.12),.91,0);root.add(spike);}
   addCylinder(root,brass,0,.46,0,.07,.064,.08);
  }
- root.rotation.set(-.1,.15,-.11);
- // Leave weapon comfortably low/right when idle; strike positioning is all controlled by tick().
- root.scale.setScalar(tier===4?.84:tier===3?.89:.96);
+
+ // Mesh local Y is the blade/shaft axis. Keep XY as the broad blade face:
+ // camera looks down -Z, so the weapon must NOT have its flat turned away.
+ root.rotation.set(0,0,0);
+ root.userData.bladeAxis='Y';
+ root.userData.bladeFace='+Z';
+ root.scale.setScalar(tier===4?.83:tier===3?.88:tier===2?.78:.92);
  return root;
 }
-function samplePose(u,heavy,side){
- const wind=heavy?.35:.22,follow=heavy?.57:.49;
- const prep=smooth(u/wind),cut=smooth((u-wind)/(follow-wind)),recovery=smooth((u-follow)/(1-follow));
- let z=0,x=0,y=0,px=0,py=0,pz=0;
- if(heavy){
-  if(u<wind){z=lerp(-.3,.12,prep);x=lerp(-.14,.94,prep);y=.13*prep;py=.08*prep;pz=.11*prep;}
-  else if(u<follow){z=lerp(.12,-.65,cut);x=lerp(.94,-.95,cut);y=-.11*cut;py=.08-.23*cut;pz=.11-.36*cut;}
-  else{z=lerp(-.65,-.3,recovery);x=lerp(-.95,-.14,recovery);y=lerp(-.11,0,recovery);py=lerp(-.15,0,recovery);pz=lerp(-.25,0,recovery);}
- }else{
-  const start=-.31,ready=start+side*1.02,end=start-side*.94;
-  if(u<wind){z=lerp(start,ready,prep);x=-.1+.17*prep;px=.13*side*prep;pz=.12*prep;}
-  else if(u<follow){z=lerp(ready,end,cut);x=lerp(.07,-.48,cut);px=lerp(.13*side,-.20*side,cut);pz=lerp(.12,-.30,cut);}
-  else{z=lerp(end,start,recovery);x=lerp(-.48,-.1,recovery);px=lerp(-.20*side,0,recovery);pz=lerp(-.3,0,recovery);}
+
+// Authored 6-DOF poses: grip (x,y,z) and wrist (pitch,yaw,roll).
+// Forward is negative Z; weapon's wide face is its local XY plane.
+// The blade travels across the camera's view in depth, not merely around Z.
+const IDLE={
+  1:{px:.44,py:-.56,pz:-.83,rx:-.19,ry:-.15,rz:.43},
+  2:{px:.54,py:-.60,pz:-1.02,rx:-.27,ry:-.20,rz:.40},
+  3:{px:.49,py:-.60,pz:-.91,rx:-.23,ry:-.13,rz:.42},
+  4:{px:.55,py:-.62,pz:-1.05,rx:-.27,ry:-.08,rz:.33}
+};
+function key(t,px,py,pz,rx,ry,rz){return {t,px,py,pz,rx,ry,rz};}
+const attacks={
+ sword:{
+  slashR:[
+   key(0,.44,-.56,-.83,-.19,-.15,.43),
+   key(.19,.77,-.36,-.89,-.27,.27,-.40), // blade out to the right, raised
+   key(.36,-.20,-.17,-1.14,.12,-.39,1.26), // diagonal edge-through-target
+   key(.57,-.50,-.51,-.89,.41,-.28,1.37),
+   key(1,.44,-.56,-.83,-.19,-.15,.43)],
+  slashL:[
+   key(0,.44,-.56,-.83,-.19,-.15,.43),
+   key(.19,-.38,-.40,-.95,.30,-.30,1.26),
+   key(.36,.37,-.08,-1.13,-.03,.31,-.67),
+   key(.57,.67,-.46,-.92,.17,.22,-.72),
+   key(1,.44,-.56,-.83,-.19,-.15,.43)],
+  heavy:[
+   key(0,.44,-.56,-.83,-.19,-.15,.43),
+   key(.32,.44,-.07,-1.22,-.76,.04,-.06),
+   key(.52,.13,-.14,-1.50,.58,-.15,.24),
+   key(.70,.15,-.77,-.91,.98,-.08,.48),
+   key(1,.44,-.56,-.83,-.19,-.15,.43)]
+ },
+ axe:{
+  slashR:[
+   key(0,.54,-.60,-1.02,-.27,-.20,.40),
+   key(.25,.79,-.05,-1.19,-.72,.20,-.54),
+   key(.46,.11,-.24,-1.48,.48,-.27,.29),
+   key(.63,.05,-.73,-1.02,1.05,-.17,.48),
+   key(1,.54,-.60,-1.02,-.27,-.20,.40)],
+  slashL:[
+   key(0,.54,-.60,-1.02,-.27,-.20,.40),
+   key(.25,-.40,-.12,-1.24,.05,-.20,1.13),
+   key(.46,.22,-.21,-1.44,.25,.23,-.27),
+   key(.63,.61,-.67,-1.04,.80,.12,-.39),
+   key(1,.54,-.60,-1.02,-.27,-.20,.40)],
+  heavy:[
+   key(0,.54,-.60,-1.02,-.27,-.20,.40),
+   key(.36,.13,.19,-1.26,-1.08,0,-.03),
+   key(.57,.05,-.24,-1.62,.78,-.08,.09),
+   key(.76,.14,-.85,-1.08,1.25,-.05,.15),
+   key(1,.54,-.60,-1.02,-.27,-.20,.40)]
+ },
+ cleaver:{
+  slashR:[
+   key(0,.49,-.60,-.91,-.23,-.13,.42),
+   key(.27,.80,-.21,-1.08,-.31,.26,-.42),
+   key(.47,-.17,-.18,-1.46,.26,-.36,1.16),
+   key(.66,-.58,-.57,-1.03,.51,-.20,1.38),
+   key(1,.49,-.60,-.91,-.23,-.13,.42)],
+  slashL:[
+   key(0,.49,-.60,-.91,-.23,-.13,.42),
+   key(.27,-.43,-.26,-1.10,.24,-.25,1.30),
+   key(.47,.28,-.19,-1.45,.20,.32,-.56),
+   key(.66,.73,-.61,-1.0,.39,.19,-.68),
+   key(1,.49,-.60,-.91,-.23,-.13,.42)],
+  heavy:[
+   key(0,.49,-.60,-.91,-.23,-.13,.42),
+   key(.34,.40,.11,-1.17,-1.02,.04,-.24),
+   key(.55,-.09,-.25,-1.60,.77,-.18,.39),
+   key(.74,-.14,-.80,-1.00,1.23,-.06,.52),
+   key(1,.49,-.60,-.91,-.23,-.13,.42)]
+ },
+ maul:{
+  slashR:[
+   key(0,.55,-.62,-1.05,-.27,-.08,.33),
+   key(.33,.44,.16,-1.28,-.96,.07,-.25),
+   key(.55,.06,-.23,-1.70,.73,-.12,.11),
+   key(.76,.02,-.87,-1.11,1.30,-.05,.24),
+   key(1,.55,-.62,-1.05,-.27,-.08,.33)],
+  slashL:[
+   key(0,.55,-.62,-1.05,-.27,-.08,.33),
+   key(.33,-.19,.10,-1.22,-.75,-.13,.61),
+   key(.55,.13,-.24,-1.72,.82,.08,-.12),
+   key(.76,.21,-.90,-1.14,1.27,.08,-.21),
+   key(1,.55,-.62,-1.05,-.27,-.08,.33)],
+  heavy:[
+   key(0,.55,-.62,-1.05,-.27,-.08,.33),
+   key(.40,.08,.27,-1.40,-1.21,0,-.08),
+   key(.62,.04,-.35,-1.78,.95,-.07,.10),
+   key(.80,.09,-.96,-1.12,1.39,0,.16),
+   key(1,.55,-.62,-1.05,-.27,-.08,.33)]
  }
- return {rx:x,ry:y,rz:z,px,py,pz};
+};
+const fields=['px','py','pz','rx','ry','rz'];
+const phaseEase=(t,strike)=>{
+ const f=clamp(t,0,1);
+ // The release phase is fast and decisive, wind-up loaded, recovery soft.
+ return strike?f*f*(3-2*f):f*f*(3-2*f);
+};
+function weaponClass(tier){return ['sword','axe','cleaver','maul'][clamp(tier||1,1,4)-1];}
+function pathFor(tier,heavy,side=1){
+ const group=attacks[weaponClass(tier)];
+ return heavy?group.heavy:side>0?group.slashR:group.slashL;
+}
+function impactTime(tier,heavy,side=1){
+ const keys=pathFor(tier,heavy,side);
+ // The cutting edge traverses the aim point slightly before the third key.
+ return keys[2].t-(heavy?.032:.045);
+}
+function releaseTime(tier,heavy,side=1){return pathFor(tier,heavy,side)[1].t-.027;}
+function samplePose(u,heavy=false,side=1,tier=1){
+ const keys=pathFor(tier,heavy,side);
+ const t=clamp(u,0,1);
+ let a=keys[0],b=keys[1],segment=0;
+ for(let i=0;i<keys.length-1;i++){
+  if(t<=keys[i+1].t||i===keys.length-2){a=keys[i];b=keys[i+1];segment=i;break;}
+ }
+ const v=phaseEase((t-a.t)/Math.max(.00001,b.t-a.t),segment===1);
+ const pose={};
+ for(const f of fields)pose[f]=lerp(a[f],b[f],v);
+ return pose;
 }
 function tick(game,dt){
  if(!game.weaponView)return;
- const p=game.hero,anim=game.attackAnim,baseX=.37,baseY=-.34,baseZ=-.72;
- const movement=Math.min(1,Math.hypot(p.vx||0,p.vz||0)/5),time=game.time||0;
- let pose;
- if(anim){anim.t=Math.min(anim.duration,anim.t+dt);const u=anim.t/anim.duration;pose=samplePose(u,anim.heavy,anim.side);
-  const impactAt=anim.heavy?.49:.36;
-  if(!anim.hit && u>=impactAt){anim.hit=true;game.resolveStrike(anim.heavy);}
-  if(u>=1)game.attackAnim=null;
- }else{pose={rx:-.10+Math.sin(time*1.45)*.008,ry:.04,rz:-.31+Math.sin(time*1.1)*.01,px:0,py:0,pz:0}}
- const sway=Math.sin(time*10)*(.007+.018*movement);
- game.weaponView.rotation.set(pose.rx,pose.ry,pose.rz);
- game.weaponView.position.set(baseX+pose.px+sway,baseY+pose.py+Math.sin(time*8)*.009,baseZ+pose.pz+movement*.024);
+ const p=game.hero,anim=game.attackAnim,time=game.time||0;
+ const tier=clamp(Math.round(C.project.assets.weapons[p.weapon]?.weight||1),1,4);
+ const idle=IDLE[tier];
+ const movement=Math.min(1,Math.hypot(p.vx||0,p.vz||0)/5);
+ let pose={...idle};
+ if(anim){
+  // A 40-70 ms hit-stop freezes only the weapon animation, not player movement.
+  const frozen=Math.min(dt,Math.max(0,anim.hitStop||0));
+  anim.hitStop=Math.max(0,(anim.hitStop||0)-dt);
+  const next=Math.min(anim.duration,anim.t+Math.max(0,dt-frozen));
+  const previous=anim.t/anim.duration,u=next/anim.duration;
+  anim.t=next;
+  pose=samplePose(u,anim.heavy,anim.side,anim.tier||tier);
+  const release=releaseTime(anim.tier||tier,anim.heavy,anim.side);
+  if(!anim.released&&previous<release&&u>=release){
+   anim.released=true;
+   if(C.audio)C.audio.effect(anim.heavy?'heavy':'swing');
+  }
+  const impact=impactTime(anim.tier||tier,anim.heavy,anim.side);
+  if(!anim.hit&&previous<impact&&u>=impact){
+   anim.hit=true;
+   const hits=game.resolveStrike(anim.heavy);
+   if(hits>0)anim.hitStop=anim.heavy?.065:.040;
+  }
+  if(u>=1){
+   const nextAttack=game.queuedStrike;
+   game.queuedStrike=null;
+   game.attackAnim=null;
+   game.hero.attack=0;
+   if(nextAttack&&game.running&&!game.paused)game.strike(nextAttack.heavy);
+  }
+ }else{
+  // Idle is a controlled hand grip, not a clockwork spinning blade.
+  const sway=Math.sin(time*1.65),breath=Math.sin(time*2.25);
+  pose={...idle,px:idle.px+breath*.007,py:idle.py+sway*.008,
+   rx:idle.rx+breath*.006,ry:idle.ry+sway*.006,rz:idle.rz+breath*.008};
+ }
+ const motion=Math.sin(time*10)*movement;
+ game.weaponView.position.set(pose.px+motion*.012,pose.py+Math.cos(time*9)*movement*.013,pose.pz);
+ game.weaponView.rotation.set(pose.rx,pose.ry,pose.rz,'XYZ');
+ // Expose pose for diagnostics and animation tests without rendering internals.
+ game.weaponView.userData.pose=pose;
+ game.weaponView.userData.bladeFacingCamera=Math.cos(pose.rx)*Math.cos(pose.ry);
 }
-C.WeaponRig={create:makeWeapon,tick,samplePose};
+C.WeaponRig={create:makeWeapon,tick,samplePose,impactTime,releaseTime,pathFor,weaponClass};
 })();
