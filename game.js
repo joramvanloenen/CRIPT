@@ -21,28 +21,15 @@ freshHero(){return{x:4.5*1.8,z:4.5*1.8,yaw:Math.PI/2,pitch:0,vx:0,vz:0,hp:100,st
 sceneTexture(asset){if(!asset)return null;if(this.images[asset.id])return this.images[asset.id];const t=new T.CanvasTexture(C.spriteCanvas(asset));t.magFilter=T.NearestFilter;t.minFilter=T.NearestFilter;t.wrapS=T.RepeatWrapping;t.wrapT=T.RepeatWrapping;t.colorSpace=T.SRGBColorSpace;this.images[asset.id]=t;return t}
 pos(room,x,z){return{x:(room.gx*9+x+.5)*1.8,z:(room.gz*9+z+.5)*1.8}}
 buildWorld(){
+ if(this.lighting)this.lighting.dispose();
  if(this.architecture)this.architecture.dispose();
  this.world.clear();
  Object.values(this.images).forEach(t=>t.dispose());
  this.images={};
  this.architecture=C.Masonry.build(this.world,C.project,asset=>this.sceneTexture(asset));
- // Tall chapels and the ruined bell hall receive pale high-window shafts.
- for(const room of Object.values(C.project.rooms)){
-  if(!['boss','shrine','entrance'].includes(room.category))continue;
-  const cfg=C.Masonry.config(room);
-  const x=(room.gx*9+4.5)*1.8,z=(room.gz*9+2.25)*1.8;
-  const h=Math.max(2.5,cfg.height-1.15);
-  const cone=new T.Mesh(new T.ConeGeometry(room.category==='boss'?3.3:2.1,h,12,1,true),
-   new T.MeshBasicMaterial({color:room.theme==='sand'?0xffd2a0:0x97dad2,
-    transparent:true,opacity:room.category==='boss'?.074:.037,depthWrite:false,side:T.DoubleSide}));
-  cone.position.set(x,h/2+.65,z);
-  this.world.add(cone);
-  if(room.category==='boss'||room.category==='shrine'){
-   const glow=new T.PointLight(room.theme==='sand'?0xf2cb91:0x93c9ba,room.category==='boss'?2.1:1.15,14,2);
-   glow.position.set(x,cfg.height-.8,z);
-   this.world.add(glow);
-  }
- }
+ this.lighting=new C.Lighting.BakedLighting(this.scene,this.world,C.project);
+ for(const mat of this.architecture.mats.values())this.lighting.attach(mat);
+ this.lighting.schedule();
 }
 
 resetActors(){
@@ -52,9 +39,34 @@ resetActors(){
    const mesh=new T.Mesh(new T.PlaneGeometry(1.25,1.85),new T.MeshBasicMaterial({map:this.sceneTexture(def),transparent:true,alphaTest:.13,side:T.DoubleSide}));mesh.position.set(p.x,1,p.z);this.actors.add(mesh);
    this.enemies.push({id:e.id,kind:e.kind,def,x:p.x,z:p.z,mesh,hp:def.hp,attack:Math.random(),stun:0,phase:Math.random()*5,alive:true})}
   for(const o of room.props||[]){const def=C.project.assets.props[o.kind];if(!def)continue;const p=this.pos(room,o.x,o.z),g=new T.Group();
-   if(o.kind==='torch'){const stick=new T.Mesh(new T.CylinderGeometry(.075,.09,.86,6),new T.MeshLambertMaterial({color:0x62513b}));stick.position.y=.48;g.add(stick);
-    const flame=new T.Mesh(new T.ConeGeometry(.14,.4,5),new T.MeshBasicMaterial({color:0xffbe71}));flame.position.y=1.12;g.add(flame);
-    const light=new T.PointLight(0xffb46b,1.7,9.5,2);light.position.y=1.18;g.add(light);this.torches.push({g,light,flame,phase:Math.random()*10});}
+   if(o.kind==='torch'){
+    const iron=new T.MeshStandardMaterial({color:0x54473c,roughness:.73,metalness:.47});
+    const stick=new T.Mesh(new T.CylinderGeometry(.055,.082,1.35,8),iron);stick.position.y=.7;g.add(stick);
+    const cup=new T.Mesh(new T.CylinderGeometry(.19,.10,.18,7),iron);cup.position.y=1.43;g.add(cup);
+    const flame=new T.Mesh(new T.ConeGeometry(.16,.49,6),new T.MeshBasicMaterial({color:0xffbe74}));flame.position.y=1.7;g.add(flame);
+    const light=new T.PointLight(0xffa95b,0,9,2);light.position.y=1.65;g.add(light);
+    this.torches.push({g,light,flame,hearth:false,phase:Math.random()*10});
+   }else if(o.kind==='fireplace'){
+    // Real masonry hearth and low-poly coals, set against the chamber wall.
+    const stone=new T.MeshStandardMaterial({color:0x696b5e,roughness:.96});
+    const soot=new T.MeshStandardMaterial({color:0x252421,roughness:1});
+    const wood=new T.MeshStandardMaterial({color:0x4e3025,roughness:1});
+    const glow=new T.MeshBasicMaterial({color:0xd36e39});
+    const box=(w,h,d,x,y,z,mat)=>{const mesh=new T.Mesh(new T.BoxGeometry(w,h,d),mat);mesh.position.set(x,y,z);g.add(mesh);return mesh};
+    box(2.55,.22,1.32,0,.13,0,stone);
+    box(.32,2.13,1.21,-1.08,1.16,0,stone);
+    box(.32,2.13,1.21,1.08,1.16,0,stone);
+    box(2.5,.26,1.30,0,2.22,0,stone);
+    box(1.93,1.85,.085,0,1.14,-.54,soot);
+    box(1.65,.13,.77,0,.29,.14,glow);
+    for(let i=0;i<3;i++){const log=new T.Mesh(new T.CylinderGeometry(.10,.13,1.24,6),wood);log.rotation.z=Math.PI/2;log.rotation.y=(i-1)*.4;log.position.set(0,.37+i*.12,.16);g.add(log)}
+    const flames=[];
+    for(let i=0;i<5;i++){const flame=new T.Mesh(new T.ConeGeometry(.17+i*.018,.65+i*.11,5),
+      new T.MeshBasicMaterial({color:i%2?0xffbf71:0xf18a42,transparent:true,opacity:.82}));
+      flame.position.set((i-2)*.28,.65+(i%2)*.12,.24);g.add(flame);flames.push(flame)}
+    const light=new T.PointLight(0xff8848,0,12,2);light.position.set(0,1.0,.53);g.add(light);
+    this.torches.push({g,light,flame:flames[0],flames,hearth:true,phase:Math.random()*10});
+   }
    else{const plane=new T.Mesh(new T.PlaneGeometry(1.17,1.17),new T.MeshBasicMaterial({map:this.sceneTexture(def),transparent:true,alphaTest:.15,side:T.DoubleSide}));plane.position.y=.59;g.add(plane)}
    g.position.set(p.x,0,p.z);this.actors.add(g);this.props.push({id:o.id,kind:o.kind,def,x:p.x,z:p.z,g,active:true})}
  }
@@ -102,7 +114,7 @@ bind(){
 }
 start(){this.hero=this.freshHero();this.flags.clear();this.chests.clear();this.seen.clear();this.time=0;this.bell=0;this.mode='grid';this.room=null;this.running=true;this.paused=false;this.resetActors();this.makeWeapon();$('gameOverlay').classList.add('hide');$('pausePanel').classList.add('hide');$('deathPanel').classList.add('hide');this.checkRoom(true);this.hud()}
 pause(value){this.paused=value;this.keys.clear();$('pausePanel').classList.toggle('hide',!value);if(value&&document.pointerLockElement)document.exitPointerLock?.()}
-checkRoom(force=false){const r=C.roomAt(this.hero.x,this.hero.z);if(!r||(!force&&r===this.room))return;this.room=r;this.seen.add(r.id);$('roomName').textContent=r.name.toUpperCase();$('roomHint').textContent=r.clue||'Listen to the stones. They are not always silent.';$('depthChip').textContent='DEPTH '+String(r.gz+1).padStart(2,'0');const a=C.project.assets.atmosphere[r.theme]||C.project.assets.atmosphere.crypt;this.scene.fog.color.set(a.fog);this.scene.fog.density=a.density;this.scene.background.set(a.fog).multiplyScalar(.21);this.hemi.intensity=a.ambient;this.lantern.intensity=a.torch*.7;}
+checkRoom(force=false){const r=C.roomAt(this.hero.x,this.hero.z);if(!r||(!force&&r===this.room))return;this.room=r;this.seen.add(r.id);$('roomName').textContent=r.name.toUpperCase();$('roomHint').textContent=r.clue||'Listen to the stones. They are not always silent.';$('depthChip').textContent='DEPTH '+String(r.gz+1).padStart(2,'0');const a=C.project.assets.atmosphere[r.theme]||C.project.assets.atmosphere.crypt;this.scene.fog.color.set(a.fog);this.scene.fog.density=a.density;this.scene.background.set(a.fog).multiplyScalar(.21);this.hemi.intensity=Math.min(.3,a.ambient*.56);this.lantern.intensity=a.torch*.48;}
 can(x,z,r=.29){if(C.isSolid(x-r,z-r)||C.isSolid(x+r,z-r)||C.isSolid(x-r,z+r)||C.isSolid(x+r,z+r))return false;if(this.architecture?.blocked(x,z,r))return false;for(const o of this.props||[]){if(!o.active||!o.def.solid)continue;if(Math.abs(x-o.x)<r+.44&&Math.abs(z-o.z)<r+.44)return false}return true}
 move(dx,dz){const p=this.hero;if(this.can(p.x+dx,p.z))p.x+=dx;if(this.can(p.x,p.z+dz))p.z+=dz}
 turn(dir){if(!this.running||this.paused)return;if(this.mode==='combat'){this.hero.yaw=(this.hero.yaw+dir*.22+TAU)%TAU;return}if(this.hero.step)return;this.hero.yaw=Math.round(this.hero.yaw/(Math.PI/2))*Math.PI/2+dir*Math.PI/2}
@@ -173,8 +185,20 @@ update(dt){if(!this.running||this.paused)return;const p=this.hero;this.time+=dt;
  if(this.bell>(C.project.settings.bellPeriod||100)){this.bell=0;C.notice('THE DISTANT BELL TOLLS');p.mp=Math.min(80,p.mp+12)}
  for(const e of this.effects){e.life-=dt;e.vy-=e.gravity*dt;e.mesh.position.x+=e.vx*dt;e.mesh.position.y+=e.vy*dt;e.mesh.position.z+=e.vz*dt;e.mesh.lookAt(this.camera.position);e.mesh.scale.setScalar(Math.max(.01,e.life/e.max))}
  this.effects=this.effects.filter(e=>{if(e.life>0)return true;this.actors.remove(e.mesh);return false});
- for(const o of this.props)if(o.active&&o.kind!=='torch')o.g.children[0]?.lookAt(this.camera.position.x,.59,this.camera.position.z);
- for(const t of this.torches){const distance=Math.hypot(t.g.position.x-p.x,t.g.position.z-p.z);t.light.intensity=distance<15?1.5+.3*Math.sin(this.time*10+t.phase):0;t.flame.scale.y=1+.14*Math.sin(this.time*11+t.phase)}
+ for(const o of this.props)if(o.active&&o.kind!=='torch'&&o.kind!=='fireplace')o.g.children[0]?.lookAt(this.camera.position.x,.59,this.camera.position.z);
+ // Baked indirect firelight remains visible across the dungeon. Spend realtime
+ // light evaluations only on the three nearest flame sources for flicker/specular.
+ const nearestLights=this.torches.map(t=>({t,d:Math.hypot(t.g.position.x-p.x,t.g.position.z-p.z)}))
+   .sort((a,b)=>a.d-b.d);
+ const realTimeBudget=C.project.editor?.quality==='low'?2:3;
+ for(let i=0;i<nearestLights.length;i++){
+  const {t,d}=nearestLights[i],enabled=i<realTimeBudget&&d<14;
+  const flicker=.91+.09*Math.sin(this.time*12+t.phase)+.055*Math.sin(this.time*21+t.phase*1.3);
+  t.light.intensity=enabled?(t.hearth?2.0:1.35)*flicker:0;
+  t.flame.scale.y=1+.14*Math.sin(this.time*11+t.phase);
+  if(t.flames)for(let n=0;n<t.flames.length;n++)t.flames[n].scale.y=.87+.18*Math.sin(this.time*(8+n)+t.phase+n);
+ }
+ this.lighting?.update(p.x,p.z,this.time);
  const nearest=this.nearest();$('interaction').textContent=nearest?'F · '+nearest.def.name.toUpperCase():'';
  if(this.frame%10===0)this.hud()}
 loop(now){requestAnimationFrame(t=>this.loop(t));const dt=Math.min(.04,Math.max(0,(now-this.last)/1000));this.last=now;this.frame++;this.update(dt);
