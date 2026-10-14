@@ -1,13 +1,13 @@
 /* CRIPT shared in-browser world workshop */
 (function(){'use strict';const C=window.Cript,$=id=>document.getElementById(id);
-const modes={dungeon:'rooms',room:'rooms',texture:'textures',character:'characters',prop:'props',weapon:'weapons',vfx:'vfx',encounter:'encounters',logic:'logic',atmosphere:'atmosphere'};
+const modes={dungeon:'rooms',room:'rooms',texture:'textures',character:'characters',prop:'props',mesh:'meshes',weapon:'weapons',vfx:'vfx',encounter:'encounters',logic:'logic',atmosphere:'atmosphere'};
 const defaultInk='#75978e';
 class Editor{
 constructor(){this.mode='dungeon';this.materialView='paint';this.selected={};this.tool='tile';this.tile='stone';this.actor='skeleton';this.prop='urn';this.color=defaultInk;this.painting=false;this.mirror=false;this.erase=false;this.fill=false;this.brush=1;this.undoStack=[];this.redoStack=[];this.canvas=$('editCanvas');this.ctx=this.canvas.getContext('2d',{willReadFrequently:true});this.ctx.imageSmoothingEnabled=false;this.bind();this.selectDefault();this.makePreview();this.refresh();this.animate();}
 selectDefault(){for(const [mode,collection]of Object.entries(modes)){const id=Object.keys(this.collection(mode))[0];if(!this.selected[mode]||!this.collection(mode)[this.selected[mode]])this.selected[mode]=id;}}
 collection(mode=this.mode){return mode==='dungeon'||mode==='room'?C.project.rooms:mode==='logic'?C.project.logic:mode==='encounter'?C.project.encounters:C.project.assets[modes[mode]]||{}}
 asset(){return this.collection()[this.selected[this.mode]]||Object.values(this.collection())[0]}
-change(){C.save();if(['room','texture','character','prop','atmosphere'].includes(this.mode)){C.game.refresh()}if(this.mode==='weapon')C.game.makeWeapon();this.draw();this.renderInspector();this.assetList()}
+change(){C.save();if(['room','texture','character','prop','atmosphere','mesh'].includes(this.mode)){C.game.refresh()}if(this.mode==='weapon')C.game.makeWeapon();this.draw();this.renderInspector();this.assetList()}
 checkpoint(){this.undoStack.push(C.copy(C.project));if(this.undoStack.length>35)this.undoStack.shift();this.redoStack.length=0}
 undo(){if(!this.undoStack.length)return;this.redoStack.push(C.copy(C.project));C.project=this.undoStack.pop();C.save();this.selectDefault();this.refresh()}
 redo(){if(!this.redoStack.length)return;this.undoStack.push(C.copy(C.project));C.project=this.redoStack.pop();C.save();this.selectDefault();this.refresh()}
@@ -25,7 +25,7 @@ $('colorPicker').oninput=e=>{this.color=e.target.value;this.palette()};$('brushS
 $('mirrorBtn').onclick=()=>{this.mirror=!this.mirror;$('mirrorBtn').style.color=this.mirror?'#eac489':''};
 $('fillBtn').onclick=()=>{this.fill=!this.fill;$('fillBtn').style.color=this.fill?'#eac489':''};
 $('eraseBtn').onclick=()=>{this.erase=!this.erase;$('eraseBtn').style.color=this.erase?'#eac489':''};
-this.canvas.addEventListener('pointerdown',e=>{if(this.mode==='texture'&&this.materialView!=='paint')return;this.canvas.setPointerCapture(e.pointerId);this.painting=true;this.checkpoint();this.paint(e)});
+this.canvas.addEventListener('pointerdown',e=>{if(this.mode==='mesh'||this.mode==='texture'&&this.materialView!=='paint')return;this.canvas.setPointerCapture(e.pointerId);this.painting=true;this.checkpoint();this.paint(e)});
 this.canvas.addEventListener('pointermove',e=>{this.coords(e);if(this.painting)this.paint(e)});
 const finish=()=>{if(!this.painting)return;this.painting=false;this.change()};
 this.canvas.addEventListener('pointerup',finish);this.canvas.addEventListener('pointercancel',finish);
@@ -153,6 +153,7 @@ draw(){const ctx=this.ctx,a=this.asset();ctx.clearRect(0,0,576,576);ctx.fillStyl
 add(){const col=this.collection();if(['dungeon','room'].includes(this.mode)){alert('The first playable chapter currently uses 16 fixed room slots. Duplicate a room into an existing slot by painting or importing a world pack.');return}this.checkpoint();let asset;
  const prefix=this.mode==='texture'?'texture':this.mode;const id=C.uid(prefix);
  if(['texture','character','prop'].includes(this.mode)){asset={id,name:'New '+this.mode,width:16,height:16,pixels:Array(256).fill(null)};if(this.mode==='texture')asset.solid=false;if(this.mode==='character')Object.assign(asset,{hp:30,damage:8,speed:2,aggro:6,ai:'chase',reward:10});if(this.mode==='prop')Object.assign(asset,{solid:false,breakable:true,hp:15,loot:''})}
+ else if(this.mode==='mesh')asset={...C.copy(C.MeshForge.presets['chipped-stone']),id,name:'Carved Stone'};
  else if(this.mode==='weapon')asset={id,name:'New Weapon',tier:1,damage:18,stamina:12,reach:1.9,cooldown:.55,weight:1,color:'#a0aaa4'};
  else if(this.mode==='vfx')asset={id,name:'New Effect',color:'#79ccc0',count:20,life:.8,size:.14,gravity:1};
  else if(this.mode==='atmosphere')asset={id,name:'New Atmosphere',fog:'#183733',density:.06,heightFog:.4,ambient:.5,torch:1.7};
