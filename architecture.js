@@ -149,14 +149,46 @@ class Masonry{
   return new T.Color().setRGB(grey/255,grey/255,grey/255);
  }
  tile(room,x,z){return room.tiles[z*9+x]}
+ flagstoneGeometry(shape,variant,w,d){
+  const key='flagstone:'+shape+':'+variant+':'+w.toFixed(2)+':'+d.toFixed(2);
+  if(!this.geom.has(key)){
+   const e=Math.min(w,d)*(.065+.013*variant),n=i=>hash(i+shape*19,variant*11,w*7+d*13);
+   // A hand-dressed irregular flag; physical outer edges are the ONLY joints.
+   const poly=[
+    [-w/2+e*(.7+n(0)*.5),-d/2], [w/2-e*(.7+n(1)*.5),-d/2],
+    [w/2,-d/2+e*(.65+n(2)*.6)], [w/2,d/2-e*(.7+n(3)*.55)],
+    [w/2-e*(.7+n(4)*.55),d/2],[-w/2+e*(.8+n(5)*.4),d/2],
+    [-w/2,d/2-e*(.65+n(6)*.5)],[-w/2,-d/2+e*(.75+n(7)*.5)]
+   ];
+   const shapeMesh=C.MeshForge.extrude(poly,{depth:.17,bevel:.025,erosion:.12,seed:shape*13+variant*7+1});
+   this.geom.set(key,C.MeshForge.toThree(T,shapeMesh));
+  }
+  return{key,geometry:this.geom.get(key)};
+ }
  ground(room,x,z,mat){
-  const [cx,cz]=this.xz(room,x,z),erosion=Number.isFinite(room.decay)?room.decay:.3;
-  // Continual flagstone UVs describe joints while a few chipped pieces break silhouette.
-  this.box(room,mat,cx,-.095,cz,S-.018,.19,S-.018,0,0,this.tint(room,x,0,z));
-  const n=hash(x*7,z*9,room.gx*9+room.gz);
-  if(n<erosion*.22){
-   const shift=(n-.5)*.26;
-   this.box(room,mat+':cut',cx+shift,.025,cz-.29,.76,.055,.63,n*.1,0,this.tint(room,x,0,z));
+  const [cx,cz]=this.xz(room,x,z),decay=Number(room.decay)||0;
+  const pick=hash(x+room.gx*9,z+room.gz*9,401);
+  // Larger slabs near central ceremonial paths; smaller fitted pieces elsewhere.
+  // No UV-painted square grout is applied: the joints exist only in mesh.
+  let pieces;
+  if(pick<.30)pieces=[[0,0,1.72,1.72]];
+  else if(pick<.60)pieces=[[-.453,0,.82,1.72],[.453,0,.82,1.72]];
+  else if(pick<.88)pieces=[[0,-.453,1.72,.82],[0,.453,1.72,.82]];
+  else pieces=[[-.45,-.45,.82,.82],[-.45,.45,.82,.82],[.45,-.45,.82,.82],[.45,.45,.82,.82]];
+  for(let i=0;i<pieces.length;i++){
+   const [ox,oz,w,d]=pieces[i],variant=(Math.floor(hash(x*7+i,z*11+i,room.gx*21+room.gz*13)*4));
+   const g=this.flagstoneGeometry(pieces.length,variant,w,d);
+   const r=hash(x*19+i,z*23+i,room.gx*4+room.gz*7);
+   const px=cx+ox+(r-.5)*.035,pz=cz+oz+(hash(i,x,z)-.5)*.03;
+   const level=(r-.5)*.012;
+   // Mesh extrusion is modeled in XY; turn the surface upwards into XZ.
+   this.instance(room,mat+':cut',g.key,g.geometry,px,-.084+level,pz,
+     -Math.PI/2,0,0,this.tint(room,px,level,pz));
+   this.count.flagstones=(this.count.flagstones||0)+1;
+  }
+  if(decay>.46&&pick>.82){
+   const patch=this.geometry(.31,.013,.25);
+   this.instance(room,'soot',patch.key,patch.geometry,cx+.28,.009,cz-.32);
   }
  }
  wallBaseDebris(room,x,z,dir,decay){
@@ -267,7 +299,7 @@ class Masonry{
     const [cx,cz]=this.xz(room,x,z);
     if(this.tile(room,x,z)==='stone')continue;
     if(room.skylight&&x>=3&&x<=5&&z>=3&&z<=5)continue;
-    this.box(room,mat,cx,height+.03,cz,S-.026,.25,S-.026);
+    this.box(room,mat+':cut',cx,height+.03,cz,S-.026,.25,S-.026);
    }
    // Low barrel rooms use crossbeams/corbels instead of giant church ribs.
    for(let z=2;z<=6;z+=2)this.box(room,'wood',centerX,height-.36,(room.gz*9+z+.5)*S,12.6,.23,.38);
@@ -286,8 +318,16 @@ class Masonry{
     const ya=spring+rise*Math.sqrt(Math.max(0,1-(xa/half)**2));
     const yb=spring+rise*Math.sqrt(Math.max(0,1-(xb/half)**2));
     const angle=Math.atan2(yb-ya,xb-xa),len=Math.hypot(step,yb-ya);
-    this.slab(room,mat,centerX+(xa+xb)/2,(ya+yb)/2,z,len+.025,.19,4.19,angle);
-    this.count.vaults++;
+    // These are actual wedge-course stones across the bay, not a brick-grid texture.
+    // Stagger joints along the nave so the curved vault behaves like bonded masonry.
+    const pieces=i%2===0?3:4;
+    const stoneDepth=4.19/pieces;
+    for(let course=0;course<pieces;course++){
+     const zStone=z-2.095+(course+.5)*stoneDepth;
+     this.slab(room,mat+':cut',centerX+(xa+xb)/2,(ya+yb)/2,zStone,
+       len+.012,.215,stoneDepth-.032,angle,this.tint(room,i,course,bay));
+     this.count.vaults++;
+    }
    }
   }
   const ribPlaces=[centerZ-6.24,centerZ-2.1,centerZ+2.1,centerZ+6.24];
