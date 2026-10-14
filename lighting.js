@@ -68,7 +68,8 @@ class BakedLighting{
     'float criptFogDistance=1.0-exp(-distance(vCriptBakedWorld,cameraPosition)*.082);',
     'float criptFog=clamp(criptFogHeight*criptFogDistance*criptHeightFogDensity,0.0,.68);',
     'gl_FragColor.rgb=mix(gl_FragColor.rgb,criptHeightFogColor,criptFog);'
-   ].join('\\n'));
+   ].join(String.fromCharCode(10)));
+
 
   };
   const oldKey=material.customProgramCacheKey?.bind(material);
