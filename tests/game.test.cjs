@@ -145,7 +145,6 @@ assert.equal(gates.length,2,'Two secret entrances must lead to annexes');
 const first=gates[0],second=gates[1];
 game.hero.x=first.x-1.32;game.hero.z=first.z;game.hero.yaw=Math.PI/2;
 assert.ok(game.gateBlocks(first.x,first.z,.27),'Concealed door must initially block movement');
-console.log('GATE DEBUG',JSON.stringify({first:{x:first.x,z:first.z,open:first.open,opening:first.opening},hero:{x:game.hero.x,z:game.hero.z,yaw:game.hero.yaw},nearest:game.nearest()?.id,others:game.props.filter(p=>Math.hypot(p.x-game.hero.x,p.z-game.hero.z)<3).map(p=>({id:p.id,x:p.x,z:p.z}))}));
 assert.equal(game.nearest()?.id,first.id,'Hidden masonry should be interactable when approached facing it');
 game.interact();
 assert.ok(first.opening>0,'Interacting must start the hidden entrance animation');
