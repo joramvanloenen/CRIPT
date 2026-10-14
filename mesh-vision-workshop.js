@@ -70,7 +70,17 @@ editor.renderInspector=function(){
  const section=document.createElement('section');section.className='forge-vision-panel';
  const heading=document.createElement('h3');heading.textContent='VISUAL EVALUATION';section.append(heading);
  paragraph(section,'Compare rendered geometry against a target. Cyan = missing silhouette, red = excess, stone = matched. Three camera views; no external AI service.', 'forge-vision-description');
- targetChoice(section,asset);
+
+ if(C.MeshForge.curated?.[asset.id]&&asset.artPass!=='gothic-01'){
+  imageButton(section,'✦ APPLY GOTHIC MODEL PASS',()=>{
+   editor.checkpoint();
+   const selected=C.MeshForge.curated[asset.id];
+   const name=asset.name,id=asset.id;
+   Object.assign(asset,structuredClone(selected),{id,name,artPass:'gothic-01'});
+   editor.change();
+  });
+ }
+  targetChoice(section,asset);
  let targets;
  try{targets=visualTargets(asset)}catch(e){paragraph(section,'Target failed: '+e.message);body.append(section);return}
  let metrics;
