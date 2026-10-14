@@ -24,10 +24,10 @@ function layered(u,v,seed){
    noise(u,v,32,seed+79)*.04);
 }
 const presets={
- stone:{type:'wall',base:[103,119,111],mortar:[24,35,33],courses:4,columns:2,relief:.68,depth:.77,erosion:.39,noise:.82,seed:17,overlay:.08},
- goldstone:{type:'wall',base:[159,130,91],mortar:[48,39,30],courses:4,columns:2,relief:.62,depth:.69,erosion:.33,noise:.76,seed:31,overlay:.08},
- moss:{type:'wall',base:[80,112,94],mortar:[20,36,32],courses:4,columns:2,relief:.85,depth:.80,erosion:.60,noise:.9,seed:47,overlay:.05},
- floor:{type:'floor',base:[104,116,107],mortar:[24,35,35],courses:2,columns:2,relief:.67,depth:.85,erosion:.48,noise:.8,seed:61,overlay:.08}
+ stone:{type:'wall',base:[103,119,111],mortar:[24,35,33],courses:4,columns:2,relief:.68,depth:.77,erosion:.39,noise:.82,wetness:.42,polish:.18,seed:17,overlay:.08},
+ goldstone:{type:'wall',base:[159,130,91],mortar:[48,39,30],courses:4,columns:2,relief:.62,depth:.69,erosion:.33,noise:.76,wetness:.22,polish:.28,seed:31,overlay:.08},
+ moss:{type:'wall',base:[80,112,94],mortar:[20,36,32],courses:4,columns:2,relief:.85,depth:.80,erosion:.60,noise:.9,wetness:.68,polish:.08,seed:47,overlay:.05},
+ floor:{type:'floor',base:[104,116,107],mortar:[24,35,35],courses:2,columns:2,relief:.67,depth:.85,erosion:.48,noise:.8,wetness:.55,polish:.40,seed:61,overlay:.08}
 };
 function recipeFor(asset){
  const preset=presets[asset?.id]||presets.stone;
@@ -48,6 +48,7 @@ function build(asset,{size=128,cut=false}={}){
  const albedo=new Uint8Array(size*size*4),normals=new Uint8Array(size*size*4),
   roughness=new Uint8Array(size*size*4);
  const isMoss=asset?.id==='moss',floor=recipe.type==='floor';
+ const wetness=clamp(Number(recipe.wetness)||0,0,1),polish=clamp(Number(recipe.polish)||0,0,1);
  const edgeWidth=clamp(.010+erosion*.008,.005,.035);
  const wrap=n=>(n%size+size)%size;
  function pixelHeight(u,v){
@@ -96,8 +97,19 @@ function build(asset,{size=128,cut=false}={}){
    albedo[j+channel]=clamp(Math.round(value*occlusion),0,255);
   }
   albedo[j+3]=255;
-  const r=clamp(.81+p.joint*.15 + (sediment-.5)*.1+erosion*.07,0,1);
-  const rough=Math.round(r*255);
+  // Stone smoothness is genuinely spatial: damp patches pool in recesses,
+  // polished high contact edges glint, intact grains remain dry and diffuse.
+  // PBR interprets the grayscale value as roughness, i.e. inverse smoothness.
+  const damp= smooth(.40,.83,noise(x/size,y/size,8,seed+501))
+    *(.42+.58*smooth(.37,.75,noise(x/size,y/size,4,seed+509)));
+  const polished= smooth(.55,.84,noise(x/size,y/size,16,seed+571))*(1-p.joint);
+  const mineralSheen=smooth(.64,.9,sediment)*(1-p.joint);
+  let r=.91+(p.grain-.5)*.1+erosion*.055 - wetness*damp*.51
+        - polish*polished*.34 - mineralSheen*.065;
+  if(floor)r-=.045;
+  if(isMoss)r+=.055;
+  r=mix(clamp(r,.24,.99),.97,p.joint*.95);
+  const rough=Math.round(clamp(r,.22,.99)*255);
   roughness[j]=roughness[j+1]=roughness[j+2]=rough;roughness[j+3]=255;
  }
  // True height-derived tangent normals. Not a sharpen filter over diffuse pixels:
@@ -111,7 +123,7 @@ function build(asset,{size=128,cut=false}={}){
   normals[i+1]=Math.round(clamp((ny*inverse*.5+.5)*255,0,255));
   normals[i+2]=Math.round(clamp((nz*inverse*.5+.5)*255,0,255));normals[i+3]=255;
  }
- return{size,width:size,height:size,recipe,albedo,normals,roughness,heightMap:height};
+ return{size,width:size,height:size,recipe,albedo,normals,roughness,smoothness:roughness,heightMap:height};
 }
 function textures(THREE,asset,{quality='medium',cut=false}={}){
  const res=quality==='low'?64:quality==='high'?256:128;
