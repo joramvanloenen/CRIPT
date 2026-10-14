@@ -69,6 +69,16 @@ renderInspector(){const a=this.asset(),body=$('inspectorBody');body.replaceChild
  if(this.tool==='tile')body.append(this.formField('MATERIAL',this.tile,'select',v=>{this.tile=v},Object.keys(C.project.assets.textures)));
  if(this.tool==='enemy')body.append(this.formField('ENEMY',this.actor,'select',v=>{this.actor=v},Object.keys(C.project.assets.characters)));
  if(this.tool==='prop')body.append(this.formField('PROP',this.prop,'select',v=>{this.prop=v},Object.keys(C.project.assets.props)));
+ const hiddenLinks=(C.project.secretPassages||[]).filter(g=>g.from===a.id||g.to===a.id);
+ if(hiddenLinks.length){
+  this.heading(body,'CONCEALED PASSAGES','These walls look solid until inspected during play. They lead to actual rooms containing hidden treasures.');
+  for(const gate of hiddenLinks){
+   const destination=gate.from===a.id?gate.to:gate.from;
+   this.button(body,'◈ '+(gate.name||'Hidden wall')+' → '+C.project.rooms[destination]?.name,()=>{
+    this.selected.room=destination;this.draw();this.renderInspector();this.assetList();
+   });
+  }
+ }
  this.heading(body,'CONNECTED PASSAGES','Toggle a cardinal door to change room access. Neighboring passages update automatically.');
  for(const dir of ['N','E','S','W'])this.button(body,(a.doors.includes(dir)?'◉ ':'○ ')+dir+' PASSAGE',()=>this.toggleDoor(a,dir));
  this.button(body,'▶ TEST THIS ROOM',()=>{this.view('game');C.game.refresh();C.game.playtest(a.id)})}
@@ -82,7 +92,7 @@ renderInspector(){const a=this.asset(),body=$('inspectorBody');body.replaceChild
    }else{
      const r=a.materialRecipe;
      this.field(body,'LAYOUT',r,'type','select',['wall','floor']);
-     for(const [title,key] of [['ROWS OF STONE','courses'],['BLOCKS PER ROW','columns'],['MORTAR DEPTH','depth'],['RELIEF STRENGTH','relief'],['LAYERED NOISE','noise'],['EROSION','erosion'],['PIXEL PAINT OVERLAY','overlay'],['RANDOM SEED','seed']]){
+     for(const [title,key] of [['ROWS OF STONE','courses'],['BLOCKS PER ROW','columns'],['MORTAR DEPTH','depth'],['RELIEF STRENGTH','relief'],['LAYERED NOISE','noise'],['EROSION','erosion'],['WET SHEEN (0–1)','wetness'],['POLISHED EDGE SHEEN (0–1)','polish'],['PIXEL PAINT OVERLAY','overlay'],['RANDOM SEED','seed']]){
        this.field(body,title,r,key,'number');
      }
    }
