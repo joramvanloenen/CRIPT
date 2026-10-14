@@ -46,7 +46,7 @@ function materialSurface(geo){
 class Masonry{
  constructor(world,project,texture){
   this.world=world;this.project=project;this.texture=texture;this.geom=new Map();
-  this.mats=new Map();this.rooms=new Map();this.colliders=[];this.count={blocks:0,arches:0,vaults:0,rubble:0,wallBaseDebris:0,rooms:0};
+  this.mats=new Map();this.rooms=new Map();this.colliders=[];this.count={blocks:0,arches:0,vaults:0,rubble:0,wallBaseDebris:0,rooms:0,modeled:0,models:new Set()};
   this.unit=new T.Object3D();
   this.surfaceTextures=[];
   for(const [id,asset]of Object.entries(project.assets.textures)){
@@ -72,26 +72,18 @@ class Masonry{
   return{key,geometry:this.geom.get(key)};
  }
  archSegment(index,segments,radius,outer,depth,style='round'){
-  const key='arch'+[index,segments,radius,outer,depth,style].join(':');
+  const key='forged-arch:'+[index,segments,radius,outer,depth,style].join(':');
   if(!this.geom.has(key)){
-   // Individual wedge-shaped voussoirs converge radially on the arch.
-   const start=Math.PI*index/segments,end=Math.PI*(index+1)/segments,eps=.009;
-   // A Gothic lancet consists of opposing arcs meeting at a high cusp.
-   // The outside radius preserves the proper thickness for compression stones.
-   const point=(theta,r)=>({
-    x:Math.cos(theta)*r,
-    y:(Math.sin(theta)+(style==='pointed'?.32*(1-Math.abs(Math.cos(theta))):0))*r
-   });
-   const a=point(start+eps,radius),b=point(start+eps,outer),
-         c=point(end-eps,outer),d=point(end-eps,radius);
-   const shape=new T.Shape();
-   shape.moveTo(a.x,a.y);
-   shape.lineTo(b.x,b.y);
-   shape.lineTo(c.x,c.y);
-   shape.lineTo(d.x,d.y);
-   shape.closePath();
-   const geo=new T.ExtrudeGeometry(shape,{depth:depth,bevelEnabled:true,bevelSize:.008,bevelThickness:.008,bevelSegments:1,steps:1,curveSegments:1});
-   geo.translate(0,0,-depth/2);this.geom.set(key,geo);
+   const start=Math.PI*index/segments,end=Math.PI*(index+1)/segments,eps=.010;
+   const point=(angle,r)=>[
+    Math.cos(angle)*r,
+    (Math.sin(angle)+(style==='pointed'?.32*(1-Math.abs(Math.cos(angle))):0))*r
+   ];
+   const outline=[point(start+eps,radius),point(start+eps,outer),
+                  point(end-eps,outer),point(end-eps,radius)];
+   const result=C.MeshForge.extrude(outline,{depth,bevel:.011,erosion:.04,seed:index+17});
+   this.geom.set(key,C.MeshForge.toThree(T,result));
+   this.count.modeled++;this.count.models.add('gothic-voussoir');
   }
   return{key,geometry:this.geom.get(key)};
  }
@@ -119,6 +111,31 @@ class Masonry{
   const g=this.geometry(w,h,d);
   this.instance(room,material,g.key,g.geometry,x,y,z,0,rotationY,rotationZ,color);
   this.count.blocks++;
+ }
+ modeled(room,material,id,x,y,z,w,h,d,yaw=0,color=null,seedOffset=0){
+  const recipe=this.project.assets.meshes?.[id]||C.MeshForge.presets[id];
+  if(!recipe)return this.box(room,material,x,y,z,w,h,d,yaw,0,color);
+  const key='forged:'+id+':'+(recipe.seed||1)+':'+seedOffset+':'+JSON.stringify(recipe);
+  if(!this.geom.has(key)){
+   const shape=C.MeshForge.build({...recipe,seed:(recipe.seed||1)+seedOffset});
+   const report=C.MeshForge.audit(shape);
+   if(!report.valid)throw Error('Invalid modeled mesh '+id+': '+report.errors.join('; '));
+   this.geom.set(key,C.MeshForge.toThree(T,shape));
+  }
+  const bounds=this.geom.get(key).getAttribute('position');
+  // Compute dimensions once per recipe. Source assets have actual dimensions.
+  if(!this._forgedDimensions)this._forgedDimensions=new Map();
+  let size=this._forgedDimensions.get(key);
+  if(!size){
+   const pos=bounds.array||[];
+   const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
+   for(let i=0;i<pos.length;i++){const axis=i%3;min[axis]=Math.min(min[axis],pos[i]);max[axis]=Math.max(max[axis],pos[i]);}
+   size=max.map((n,i)=>Math.max(.001,n-min[i]));
+   this._forgedDimensions.set(key,size);
+  }
+  this.instance(room,material,key,this.geom.get(key),x,y,z,0,yaw,0,color,
+   [w/size[0],h/size[1],d/size[2]]);
+  this.count.modeled++;this.count.models.add(id);
  }
  slab(room,material,x,y,z,w,h,d,rotation=0,tint=null){this.box(room,material,x,y,z,w,h,d,0,rotation,tint)}
  xz(room,x,z){return[(room.gx*9+x+.5)*S,(room.gz*9+z+.5)*S]}
@@ -186,7 +203,7 @@ class Masonry{
    const y=(1+Math.floor(hash(x,z,45)*(rows-1)))*(height/rows);
    const offset=hash(x*13,z*19,13)>.5?-.44:.44;
    const xx=fx+(eastWest?dx*.12:offset),zz=fz+(eastWest?offset:dz*.12);
-   this.box(room,mat+':cut',xx,y,zz,eastWest?.11:.64,.39,eastWest?.64:.11,0,(hash(x,z,64)-.5)*.09,this.tint(room,x,y,z));
+   this.modeled(room,mat+':cut','chipped-stone',xx,y,zz,eastWest?.11:.64,.39,eastWest?.64:.11,0,this.tint(room,x,y,z),(x+z)%3);
   }
   // Quoins and heavy buttresses remain modeled stone for strong silhouettes.
   if((x+z)%3===0){
@@ -200,7 +217,7 @@ class Masonry{
  pier(room,x,z,height){
   const [cx,cz]=this.xz(room,x,z),mat=this.palette(room)+':cut',n=room.decay;
   for(let y=.3;y<height;y+=.52){
-   this.box(room,mat,cx,y,cz,.82,Math.min(.5,height-y+.2),.82,0,0,this.tint(room,x,y,z));
+   this.modeled(room,mat,'chipped-stone',cx,y,cz,.82,Math.min(.5,height-y+.2),.82,0,this.tint(room,x,y,z),Math.round(y*2)%3);
   }
   for(const h of [.19,height-1.0,height-.21]){
    this.box(room,'trim',cx,h,cz,h===height-.21?1.12:1.01,.24,h===height-.21?1.12:1.01);
@@ -213,7 +230,7 @@ class Masonry{
   // Left and right springers rest on square piers; the key stone locks the arch.
   const side=x=>{const xx=cx+Math.cos(yaw)*x,zz=cz-Math.sin(yaw)*x;
    for(let i=0;i<5;i++){const cy=(i+.5)*base/5;
-    this.box(room,mat,xx,cy,zz,.39*scale,base/5-.018,.52*scale,yaw,0,this.tint(room,cx+i,cy,cz))}
+    this.modeled(room,mat,'chipped-stone',xx,cy,zz,.39*scale,base/5-.018,.52*scale,yaw,this.tint(room,cx+i,cy,cz),i%2)}
   };
   side(-1.13*scale);side(1.13*scale);
   for(let i=0;i<segments;i++){
@@ -223,7 +240,7 @@ class Masonry{
   }
   // A heavy crowned keystone visible from a distance.
   const crown=base+outer*(style==='pointed'?1.32:1)-.025;
-  this.box(room,'trim',cx,crown,cz,.28*scale,.3*scale,.55*scale,yaw);
+  this.modeled(room,'trim','carved-capital',cx,crown,cz,.32*scale,.28*scale,.58*scale,yaw);
  }
  doorway(room,edge,cfg){
   // Two adjacent chambers can share one physical threshold. Decorate each visible side
@@ -413,7 +430,7 @@ class Masonry{
     const xx=px+(rnd-.5)*1.15,zz=pz+(hash(x,k,z*3)-.5)*1.1;
     const rubbleSizes=[[.17,.08,.22],[.28,.13,.26],[.38,.18,.35],[.25,.10,.44]];
     const [w,h,d]=rubbleSizes[Math.floor(rnd*rubbleSizes.length)];
-    this.box(room,rnd>.8?'trim':mat+':cut',xx,h/2+.03,zz,w,h,d,0,(rnd-.5)*.56,this.tint(room,xx,h,zz));this.count.rubble++;
+    this.modeled(room,rnd>.8?'trim':mat+':cut','chipped-stone',xx,h/2+.03,zz,w,h,d,0,this.tint(room,xx,h,zz),k%3);this.count.rubble++;
    }
   }
   // Soot blooms and moss at the base of exposed masonry are age-dependent.
@@ -467,6 +484,7 @@ class Masonry{
    }
    store.group.userData.criptRoom=store.room.id;
   }
+  this.count.models=[...this.count.models];
   return this.count;
  }
  dispose(){
