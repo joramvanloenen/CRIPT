@@ -57,6 +57,7 @@ renderInspector(){const a=this.asset(),body=$('inspectorBody');body.replaceChild
  this.field(body,'CEILING HEIGHT (METRES)',a,'ceilingHeight','number');
  this.field(body,'VAULT CONSTRUCTION',a,'vaultStyle','select',['flat','barrel','cross','ribbed']);
  this.field(body,'DOOR ARCH PROFILE',a,'archStyle','select',['round','pointed']);
+ this.field(body,'OPEN ROOF / MOONLIGHT',a,'skylight','checkbox');
  this.field(body,'STONE DECAY 0–1',a,'decay','number');
  this.button(body,'⛏ BUILD FOR ROOM PURPOSE',()=>{
    const preset=C.Masonry.profiles[a.category]||C.Masonry.profiles.combat;
@@ -99,7 +100,13 @@ renderInspector(){const a=this.asset(),body=$('inspectorBody');body.replaceChild
  if(this.mode==='vfx'){this.heading(body,'PARTICLE EFFECT DESIGNER','Color, count, lifespan, size and gravity are used by the runtime particle emitter.');this.field(body,'COLOR',a,'color','color');for(const k of ['count','life','size','gravity'])this.field(body,k.toUpperCase(),a,k,'number');this.button(body,'✧ PREVIEW BURST IN GAME',()=>{this.view('game');C.game.emit(C.game.hero.x,1.4,C.game.hero.z,a.id)})}
  if(this.mode==='encounter'){this.heading(body,'ENCOUNTER RULES','Choose how rooms manage waves and door locks.');this.field(body,'SEAL DOORS DURING FIGHT',a,'sealDoors','checkbox');this.field(body,'WAVES',a,'waves','number');this.field(body,'ENEMY POWER MULTIPLIER',a,'multiplier','number')}
  if(this.mode==='logic'){this.heading(body,'SECRET / TRIGGER GRAPH','Typed event-to-reward rule. Define conditions without executing user-provided JavaScript.');this.field(body,'ROOM',a,'room','select',Object.keys(C.project.rooms));this.field(body,'GRID X',a,'x','number');this.field(body,'GRID Z',a,'z','number');this.field(body,'TRIGGER',a,'type','select',['interact','boss','enter','spell']);this.field(body,'REQUIRES',a,'requires','select',['veil','clear','key','none']);this.field(body,'REWARD',a,'reward','select',['maul','cleaver','axe','victory','magic']);this.field(body,'DISCOVERY HINT',a,'hint','textarea');this.heading(body,'EXECUTION','Built-in starter secret and bell events are wired in the runtime. Additional authored graphs require runtime handler support.')}
- if(this.mode==='atmosphere'){this.heading(body,'FOG & LIGHT','A room references an atmosphere preset. Lighting and distance fog are immediately applied during playtest.');this.field(body,'FOG COLOR',a,'fog','color');for(const k of ['density','heightFog','ambient','torch'])this.field(body,k.toUpperCase(),a,k,'number');this.button(body,'APPLY TO SELECTED ROOM',()=>{this.checkpoint();C.project.rooms[this.selected.room||'room-0'].theme=a.id;this.change()})}
+ if(this.mode==='atmosphere'){this.heading(body,'FOG & LIGHT','A room references an atmosphere preset. Static torch, fireplace and moonlight illumination is baked into one compact light atlas.');this.field(body,'FOG COLOR',a,'fog','color');for(const k of ['density','heightFog','ambient','torch'])this.field(body,k.toUpperCase(),a,k,'number');this.button(body,'APPLY TO SELECTED ROOM',()=>{this.checkpoint();C.project.rooms[this.selected.room||'room-0'].theme=a.id;this.change()});
+  this.heading(body,'BAKED GI / AMBIENT OCCLUSION','Atlas sampling is world-space, including instances. Bake runs off-thread and keeps torch/fire bounce and recessed corners consistent.');
+  this.field(body,'LIGHTING QUALITY',C.project.editor,'quality','select',['low','medium','high']);
+  this.button(body,'☀ REBAKE GLOBAL ILLUMINATION',()=>{C.game.lighting?.schedule();C.notice('BAKING STATIC LIGHT AND OCCLUSION')});
+  const metrics=C.game.lighting?.stats;
+  if(metrics)this.heading(body,'LIGHTMAP',metrics.samples+' GI/AO probes · '+metrics.lights+' light emitters · '+metrics.occlusions+' blocked rays');
+ }
  }
 toggleDoor(a,dir){const other=C.topology(a)[dir];if(!other){alert('This passage leads beyond the current dungeon bounds.');return}this.checkpoint();const isOpen=a.doors.includes(dir);a.doors=isOpen?a.doors.filter(d=>d!==dir):[...a.doors,dir];const counterpart={N:'S',S:'N',W:'E',E:'W'}[dir],r=C.project.rooms[other];if(isOpen)r.doors=r.doors.filter(d=>d!==counterpart);else if(!r.doors.includes(counterpart))r.doors.push(counterpart);
  const positions={N:[[4,0],[4,8]],S:[[4,8],[4,0]],W:[[0,4],[8,4]],E:[[8,4],[0,4]]},pair=positions[dir];a.tiles[pair[0][1]*9+pair[0][0]]=isOpen?'stone':'floor';r.tiles[pair[1][1]*9+pair[1][0]]=isOpen?'stone':'floor';this.change()}
