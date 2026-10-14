@@ -43,12 +43,12 @@ class Shape{moveTo(){}lineTo(){}closePath(){}}
 class Renderer{constructor(){this.domElement=el();this.outputColorSpace='';}
  setPixelRatio(){}setSize(){}render(){}}
 class Texture{dispose(){}}
-const T={Scene:Obj,Group:Obj,PerspectiveCamera:Obj,WebGLRenderer:Renderer,HemisphereLight:Obj,PointLight:Obj,InstancedMesh:Obj,Mesh:Obj,MeshLambertMaterial:Material,MeshBasicMaterial:Material,MeshStandardMaterial:Material,
+const T={Scene:Obj,Group:Obj,PerspectiveCamera:Obj,WebGLRenderer:Renderer,HemisphereLight:Obj,PointLight:Obj,InstancedMesh:Obj,Mesh:Obj,MeshLambertMaterial:Material,MeshBasicMaterial:Material,MeshStandardMaterial:Material,DataTexture:Texture,Vector2:class{constructor(x,y){this.x=x;this.y=y}},
  BoxGeometry:Geometry,PlaneGeometry:Geometry,CylinderGeometry:Geometry,ConeGeometry:Geometry,IcosahedronGeometry:Geometry,ExtrudeGeometry:Geometry,Object3D:Obj,CanvasTexture:Texture,
- Shape,FogExp2:Fog,Color,SRGBColorSpace:1,NearestFilter:2,RepeatWrapping:3,DoubleSide:4,FrontSide:0};
+ Shape,FogExp2:Fog,Color,SRGBColorSpace:1,NearestFilter:2,NearestMipmapNearestFilter:2,RepeatWrapping:3,DoubleSide:4,FrontSide:0,RGBAFormat:1023,UnsignedByteType:5121};
 const window={THREE:T,addEventListener(){}},localStorage={getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v)},performance={now:()=>0};
 const sandbox={window,document,localStorage,performance,Math,setTimeout,clearTimeout,requestAnimationFrame(){},console,confirm:()=>true,alert(){}};
-for(const file of ['data.js','weapons.js','architecture.js','game.js']){
+for(const file of ['data.js','weapons.js','procedural-stone.js','architecture.js','game.js']){
  vm.runInNewContext(fs.readFileSync(file,'utf8'),sandbox,{filename:file});
 }
 const C=window.Cript,game=C.game;
