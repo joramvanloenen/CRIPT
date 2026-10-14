@@ -110,6 +110,24 @@ editor.renderInspector=function(){
  };
  this.heading(body,'MODELING PARAMETERS','Real profile extrusion, bevel rings, rotational lathing and curved sweep surfaces.');
  for(const key of groups[a.type]||groups.ashlar)this.field(body,key.replace(/([A-Z])/g,' $1').toUpperCase(),a,key,'number');
+ if(a.type==='urn'||a.type==='bell'){
+  this.heading(body,'LATHE CROSS-SECTION','Edit the actual radius/height curve for the exterior, lip and hollow interior; changes are audited for manifold topology.');
+  if(!a.latheProfile){
+   this.button(body,'◈ MAKE REVOLVED PROFILE EDITABLE',()=>{
+    this.checkpoint();a.latheProfile=C.copy(C.MeshForge.latheProfiles[a.type]);this.change();
+   });
+  }else{
+   body.append(this.formField('LATHE PROFILE [radius, height]',JSON.stringify(a.latheProfile),'textarea',value=>{
+    try{
+     const profile=JSON.parse(value),candidate={...a,latheProfile:profile};
+     const report=C.MeshForge.audit(C.MeshForge.build(candidate));
+     if(!report.valid)throw Error(report.errors.join(', '));
+     this.checkpoint();a.latheProfile=profile;this.change();
+    }catch(error){alert('Profile edit rejected: '+error.message)}
+   }));
+  }
+ }
+
  if(a.type==='profile'||a.type==='voussoir'){
   body.append(this.formField('2D OUTLINE / VERTICES',JSON.stringify(a.outline||[],null,1),'textarea',v=>{
    try{
