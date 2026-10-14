@@ -100,6 +100,15 @@ function sweep(path,section){
  for(const [a,b,c]of caps){mesh.triangle(rings[0][c],rings[0][b],rings[0][a]);mesh.triangle(rings.at(-1)[a],rings.at(-1)[b],rings.at(-1)[c]);}
  return mesh;
 }
+const latheProfiles={urn:[
+    [.19,0],[.24,.05],[.27,.15],[.39,.38],[.49,.62],[.44,.97],
+    [.29,1.21],[.24,1.38],[.32,1.45], // outside neck and broad lip
+    [.28,1.47],[.22,1.39],[.17,1.19],[.28,.78],[.30,.55],[.13,.20],[.08,.08]
+   ],bell:[
+    [.49,.12],[.53,.20],[.49,.33],[.53,.49],[.43,.71],[.30,.92],[.15,1.14],
+    [.10,1.24],[.08,1.23],[.12,1.12],[.25,.86],[.36,.70],
+    [.43,.49],[.43,.29],[.40,.18]
+    ]};
 const presets={
  'chipped-stone':{id:'chipped-stone',name:'Carved Ashlar',type:'ashlar',width:1.3,height:.61,depth:.55,bevel:.05,erosion:.24,seed:19},
  'gothic-voussoir':{id:'gothic-voussoir',name:'Arch Keystone',type:'profile',outline:[[-.33,-.20],[.33,-.20],[.47,.22],[-.47,.22]],depth:.52,bevel:.024,erosion:.09,seed:23},
@@ -126,15 +135,8 @@ function build(recipe){
   const r=clamp(+recipe.radius||.31,.06,1.9),profile=[[r*1.35,0],[r*1.30,.10],[r,.22],[r*.90,.37],[r*.89,h-.3],[r,h-.18],[r*1.32,h-.12],[r*1.42,h]];
   result=lathe(profile,{segments:recipe.segments,flutes:recipe.flutes,fluteDepth:recipe.fluteDepth});
  }else if(type==='urn'||type==='bell'){
-  const p=type==='urn'?[
-    [.19,0],[.24,.05],[.27,.15],[.39,.38],[.49,.62],[.44,.97],
-    [.29,1.21],[.24,1.38],[.32,1.45], // outside neck and broad lip
-    [.28,1.47],[.22,1.39],[.17,1.19],[.28,.78],[.30,.55],[.13,.20],[.08,.08]
-   ]:[
-    [.49,.12],[.53,.20],[.49,.33],[.53,.49],[.43,.71],[.30,.92],[.15,1.14],
-    [.10,1.24],[.08,1.23],[.12,1.12],[.25,.86],[.36,.70],
-    [.43,.49],[.43,.29],[.40,.18]
-   ];
+  const p=recipe.latheProfile||latheProfiles[type];
+  if(!Array.isArray(p)||p.length<6||p.length>64||p.some(q=>!Array.isArray(q)||q.length!==2||!q.every(Number.isFinite)))throw Error('Invalid lathe cross-section');
   // Trace exterior and interior as one closed cross-section: there is a real
   // throat/opening, no primitive cap sealing the top of an urn or bell.
   result=lathe(p.map(q=>[q[0]*w,q[1]*h/1.47]),{segments:recipe.segments||24,closeProfile:true});
@@ -207,5 +209,5 @@ function refine(recipe,iterations=12){
  if(!best)throw Error('All modeling candidates invalid');
  return{...best,history};
 }
-C.MeshForge={build,audit,toThree,asObj,refine,presets,extrude,lathe,sweep,chippedOutline};
+C.MeshForge={build,audit,toThree,asObj,refine,presets,latheProfiles,extrude,lathe,sweep,chippedOutline};
 })();
