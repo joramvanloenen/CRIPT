@@ -66,6 +66,12 @@ resetActors(){
       flame.position.set((i-2)*.28,.65+(i%2)*.12,.24);g.add(flame);flames.push(flame)}
     const light=new T.PointLight(0xff8848,0,12,2);light.position.set(0,1.0,.53);g.add(light);
     this.torches.push({g,light,flame:flames[0],flames,hearth:true,phase:Math.random()*10});
+   }else if(o.kind==='urn'){
+    // Use the exact same hollow wheel-thrown lathe geometry as the Mesh Forge.
+    const model=C.project.assets.meshes?.urn||C.MeshForge.presets.urn;
+    const urn=new T.Mesh(C.MeshForge.toThree(T,C.MeshForge.build(model)),
+      new T.MeshStandardMaterial({color:0x867e6e,metalness:0,roughness:.9,flatShading:false}));
+    urn.scale.set(.73,.83,.73);urn.position.y=.04;g.add(urn);
    }
    else{const plane=new T.Mesh(new T.PlaneGeometry(1.17,1.17),new T.MeshBasicMaterial({map:this.sceneTexture(def),transparent:true,alphaTest:.15,side:T.DoubleSide}));plane.position.y=.59;g.add(plane)}
    g.position.set(p.x,0,p.z);this.actors.add(g);this.props.push({id:o.id,kind:o.kind,def,x:p.x,z:p.z,g,active:true})}
