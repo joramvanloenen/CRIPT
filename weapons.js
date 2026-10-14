@@ -208,13 +208,70 @@ function samplePose(u,heavy=false,side=1,tier=1){
  for(const f of fields)pose[f]=lerp(a[f],b[f],v);
  return pose;
 }
+// A tiny camera-space ribbon follows the cutting edge for ~100ms.
+// No full-screen motion blur or post-processing: 7 quads, updated in place.
+function resetTrail(game){
+ const old=game.weaponTrail;
+ if(!old)return;
+ old.mesh.parent?.remove(old.mesh);
+ old.geometry.dispose?.();old.mesh.material.dispose?.();
+ game.weaponTrail=null;
+}
+function strokeTrail(game,dt,pose,active,tier){
+ if(!T.BufferGeometry||!T.Float32BufferAttribute||!T.Vector3||!T.Euler)return;
+ if(!game.weaponTrail){
+  const positions=new Float32Array(7*6*3),geometry=new T.BufferGeometry();
+  const attribute=new T.Float32BufferAttribute(positions,3);
+  attribute.setUsage(T.DynamicDrawUsage);
+  geometry.setAttribute('position',attribute);
+  geometry.setDrawRange(0,0);
+  const material=new T.MeshBasicMaterial({
+   color:0xc7c7bd,transparent:true,opacity:.14,depthWrite:false,depthTest:false,
+   side:T.DoubleSide,blending:T.AdditiveBlending
+  });
+  const mesh=new T.Mesh(geometry,material);
+  mesh.frustumCulled=false;mesh.renderOrder=28;
+  game.camera.add(mesh);
+  game.weaponTrail={mesh,geometry,attribute,samples:[],time:0};
+ }
+ const trail=game.weaponTrail;
+ trail.time+=dt;
+ if(active&&dt>0){
+  const modelScale=[0,.92,.78,.88,.83][tier];
+  const tipY=[0,1.0,1.1,1.16,1.13][tier];
+  const baseY=tier===4?.67:tier===2?.64:.41;
+  const rot=new T.Euler(pose.rx,pose.ry,pose.rz,'XYZ');
+  const point=y=>new T.Vector3(0,y*modelScale,0).applyEuler(rot)
+    .add(new T.Vector3(pose.px,pose.py,pose.pz));
+  const tip=point(tipY),heel=point(baseY);
+  // Cap afterimages at 30cm visual width; weapon silhouette remains readable.
+  trail.samples.push({tip,heel,at:trail.time});
+ }
+ trail.samples=trail.samples.filter(item=>trail.time-item.at<.095).slice(-8);
+ const count=Math.max(0,trail.samples.length-1);
+ if(!count){trail.geometry.setDrawRange(0,0);trail.mesh.visible=false;return}
+ trail.mesh.visible=true;
+ const p=trail.attribute;
+ let at=0;
+ const add=v=>{p.setXYZ(at++,v.x,v.y,v.z)};
+ for(let i=0;i<count;i++){
+  const a=trail.samples[i],b=trail.samples[i+1];
+  add(a.tip);add(a.heel);add(b.tip);
+  add(a.heel);add(b.heel);add(b.tip);
+ }
+ p.needsUpdate=true;
+ trail.geometry.setDrawRange(0,at);
+ trail.mesh.material.opacity=.13*(1-(trail.time-trail.samples[trail.samples.length-1].at)/.14);
+ trail.mesh.material.opacity=Math.max(.035,trail.mesh.material.opacity);
+ trail.geometry.computeBoundingSphere();
+}
 function tick(game,dt){
  if(!game.weaponView)return;
  const p=game.hero,anim=game.attackAnim,time=game.time||0;
  const tier=clamp(Math.round(C.project.assets.weapons[p.weapon]?.weight||1),1,4);
  const idle=IDLE[tier];
  const movement=Math.min(1,Math.hypot(p.vx||0,p.vz||0)/5);
- let pose={...idle};
+ let pose={...idle},trailActive=false;
  if(anim){
   // A 40-70 ms hit-stop freezes only the weapon animation, not player movement.
   const frozen=Math.min(dt,Math.max(0,anim.hitStop||0));
@@ -223,6 +280,8 @@ function tick(game,dt){
   const previous=anim.t/anim.duration,u=next/anim.duration;
   anim.t=next;
   pose=samplePose(u,anim.heavy,anim.side,anim.tier||tier);
+  trailActive=u>releaseTime(anim.tier||tier,anim.heavy,anim.side)-.02 &&
+    u<impactTime(anim.tier||tier,anim.heavy,anim.side)+.17;
   const release=releaseTime(anim.tier||tier,anim.heavy,anim.side);
   if(!anim.released&&previous<release&&u>=release){
    anim.released=true;
@@ -253,6 +312,7 @@ function tick(game,dt){
  // Expose pose for diagnostics and animation tests without rendering internals.
  game.weaponView.userData.pose=pose;
  game.weaponView.userData.bladeFacingCamera=Math.cos(pose.rx)*Math.cos(pose.ry);
+ strokeTrail(game,dt,pose,trailActive,tier);
 }
-C.WeaponRig={create:makeWeapon,tick,samplePose,impactTime,releaseTime,pathFor,weaponClass};
+C.WeaponRig={create:makeWeapon,tick,samplePose,impactTime,releaseTime,pathFor,weaponClass,resetTrail};
 })();
