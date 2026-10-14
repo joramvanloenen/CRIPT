@@ -345,6 +345,14 @@ class Masonry{
    place(mat,0,1.10,-2.75,2.75,1.18,1.3);
    {const [bx,bz]=off(0,-2.75);this.collider(room,bx,bz,2.8,1.32,yaw)}
    place('ivory',0,1.76,-2.75,2.98,.16,1.5);
+   // Cathedral bay: actual turned/fluted column shafts, modeled bases and
+   // carved capitals. The asset can be remodeled in Mesh Forge and reused.
+   for(const dx of [-3.05,3.05])for(const dz of [-1.9,1.3]){
+    const [px,pz]=off(dx,dz),height=Math.max(2.6,cfg.height*.66);
+    this.modeled(room,mat,'fluted-column',px,0,pz,.73,height,.73,yaw);
+    this.modeled(room,'trim','carved-capital',px,height-.12,pz,1.07,.38,1.03,yaw);
+    this.collider(room,px,pz,.8,.8,yaw);
+   }
    for(const dx of [-2.6,2.6]){
     for(let i=0;i<4;i++){
      const dz=-2.2+i*.85;
@@ -368,14 +376,17 @@ class Masonry{
     // Monumental engaged piers and a bell-wheel relief over the altar.
     for(const dx of [-1.9,1.9])place('trim',dx,3.5,-2.75,.73,3.5,.75);
     place('gold',0,cfg.height*.56,-3.15,.46,.52,.20);
+    // Hanging bell with a profile-modeled flared bronze skirt.
+    const [bellX,bellZ]=off(0,-2.65);
+    this.modeled(room,'gold','bell',bellX,cfg.height*.64,bellZ,1.3,1.32,1.3,yaw);
+
    }
   }else if(role==='tomb'||role==='secret'){
    // Burial wall: two side sarcophagi, sunken stone niches, memorial slabs.
    for(const dx of [-2.65,2.65]){
     const [px,pz]=plinth(dx,-1.6,1.3,2.6,.31,mat);
-    this.box(room,'trim',px,.74,pz,1.12,.44,2.38);
+    this.modeled(room,mat,'stone-sarcophagus',px,.64,pz,1.12,.80,2.38,yaw);
     this.collider(room,px,pz,1.18,2.4,yaw);
-    this.box(room,'ivory',px,1.02,pz,.48,.12,1.4);
     this.box(room,'shadow',px,2.1,pz-1.25,.9,1.7,.12);
     this.arch(room,px,pz-1.18,0,.52,2.03,mat);
    }
@@ -491,7 +502,7 @@ class Masonry{
   for(const geometry of this.geom.values())geometry.dispose?.();
   for(const mat of this.mats.values())mat.dispose?.();
   for(const tex of this.surfaceTextures)tex.dispose?.();this.surfaceTextures.length=0;
-  this.geom.clear();this.mats.clear();this.rooms.clear();
+  this.geom.clear();this.mats.clear();this.rooms.clear();this._forgedDimensions?.clear();
  }
  floorHeightAt(x,z){
   const gx=Math.floor(x/(9*S)),gz=Math.floor(z/(9*S));
