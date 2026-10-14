@@ -60,7 +60,7 @@ function build(asset,{size=128,cut=false}={}){
   const partX=fract(xx);
   const eY=Math.min(partY,1-partY)/rows;
   const eX=Math.min(partX,1-partX)/cols;
-  const nearest=Math.min(eX,eY),joint=1-smooth(edgeWidth*.25,edgeWidth*1.24,nearest);
+  const nearest=Math.min(eX,eY),joint=cut?0:1-smooth(edgeWidth*.25,edgeWidth*1.24,nearest);
   const chipped=noise(u,v,32,seed+307);
   const damage=smooth(.67,.92,chipped)*erosion*.082;
   // Both endpoints of each textured tile share exactly the same mortar and noise.
@@ -68,7 +68,7 @@ function build(asset,{size=128,cut=false}={}){
   const larger=noise(u,v,4,seed+111);
   const stoneId=hash(((Math.floor(xx)%cols)+cols)%cols,row,seed+47);
   const face=(raw-.5)*.115*grain+(larger-.5)*.09*grain+(stoneId-.5)*.037;
-  const bevel=smooth(edgeWidth*.42,edgeWidth*2.35,nearest);
+  const bevel=cut?1:smooth(edgeWidth*.42,edgeWidth*2.35,nearest);
   const h=(.055+face)*strength*bevel - joint*mortar*.17-damage;
   return{h,joint,bevel,grain:raw,stoneId,damage,nearest};
  }
