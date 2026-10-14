@@ -31,7 +31,9 @@ class Mesh{
  triangle(a,b,c){
   const n=cross(sub(b,a),sub(c,a)),ln=len(n);if(ln<1e-9)return;
   const normal=mul(n,1/ln);
-  for(const p of [a,b,c]){this.positions.push(...p);this.normals.push(...normal);this.uvs.push(p[0]/1.8,p[1]/1.8)}
+  const axis=[Math.abs(normal[0]),Math.abs(normal[1]),Math.abs(normal[2])].indexOf(Math.max(...normal.map(Math.abs)));
+  for(const p of [a,b,c]){this.positions.push(...p);this.normals.push(...normal);
+   this.uvs.push(...(axis===0?[p[2]/1.8,p[1]/1.8]:axis===1?[p[0]/1.8,p[2]/1.8]:[p[0]/1.8,p[1]/1.8]))}
   this.triangles++;
  }
  quad(a,b,c,d){this.triangle(a,b,c);this.triangle(a,c,d);}
@@ -155,7 +157,7 @@ function audit(mesh){
  if(nonmanifold)errors.push('Non-manifold edges: '+nonmanifold);
  return{valid:errors.length===0,errors,triangles:mesh.triangles,vertices:p.length/3,
   boundaryEdges:boundaries,nonmanifoldEdges:nonmanifold,area:+area.toFixed(3),
-  dimensions:max.map((n,i)=>+(n-min[i]).toFixed(3)),uvs:mesh.uvs.length/2};
+  bounds:{min,max},dimensions:max.map((n,i)=>+(n-min[i]).toFixed(3)),uvs:mesh.uvs.length/2};
 }
 function toThree(T,mesh){
  const g=new T.BufferGeometry();
