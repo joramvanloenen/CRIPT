@@ -1,0 +1,28 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const window={};vm.runInNewContext(fs.readFileSync('mesh-forge.js','utf8'),{window,Math,console},{filename:'mesh-forge.js'});
+const forge=window.Cript.MeshForge;
+assert.ok(forge&&Object.keys(forge.presets).length>=8);
+for(const [id,recipe] of Object.entries(forge.presets)){
+ const mesh=forge.build(recipe),report=forge.audit(mesh);
+ assert.ok(report.valid,id+': '+report.errors.join(', '));
+ assert.ok(report.triangles>=24,id+' had no modeled surfaces');
+ assert.equal(mesh.positions.length,mesh.normals.length,id+' normal count');
+ assert.equal(mesh.uvs.length,mesh.positions.length/3*2,id+' UV count');
+ assert.ok(report.dimensions.every(x=>x>.01),id+' needs 3D volume');
+ assert.ok(report.bounds&&report.bounds.min.length===3,'Preview must have bounds');
+ assert.deepEqual(forge.build(recipe).positions,mesh.positions,id+' not deterministic');
+}
+const prism=forge.extrude([[-1,-1],[1,-1],[1,1],[-1,1]],{depth:.4,bevel:.06,erosion:.1});
+assert.ok(forge.audit(prism).valid,'Extrusion should remain watertight');
+const peaked=forge.extrude([[-1,-.5],[1,-.5],[1,.25],[0,.95],[-1,.25]],{depth:.55,bevel:.03});
+assert.ok(forge.audit(peaked).valid,'Roof/gable cross-section not manifold');
+const rib=forge.build({type:'rib',span:6,rise:1.8,segments:16});
+assert.ok(forge.audit(rib).valid,'Swept vaulted rib not manifold');
+const ref=forge.refine(forge.presets['chipped-stone'],12);
+assert.equal(ref.history.length,12);
+assert.ok(ref.report.valid&&ref.score>0,'Closed-loop candidate failed audit');
+const obj=forge.asObj(rib,'Test Rib');
+assert.ok(obj.includes('vt ')&&obj.includes('vn ')&&obj.includes('f '),'OBJ lacks UV/normals/faces');
+assert.throws(()=>forge.build({type:'eval',code:'alert(1)'}),/Unsupported/);
+assert.throws(()=>forge.build({type:'profile',outline:[[0,0],[1,0],[2,0]]}),/Zero-area/);
+console.log('PASS: '+Object.keys(forge.presets).length+' watertight modeled assets; profile extrusion; bevels; lathe; curved sweep; OBJ; 12-step audited refinement');
