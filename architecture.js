@@ -63,7 +63,7 @@ class Masonry{
    }
   }
   for(const [id,color]of Object.entries({mortar:0x192525,shadow:0x101d1c,trim:0x889187,ivory:0xbeb99f,soot:0x343c38,iron:0x514b42,wood:0x564b38,lichen:0x4b7561,gold:0xb59a70,glass:0x98d6b9,light:0xcddcc0,water:0x2c645d})){
-   this.mats.set(id,new T.MeshLambertMaterial({color,side:T.DoubleSide}));
+   this.mats.set(id,new T.MeshStandardMaterial({color,side:T.DoubleSide,roughness:id==='iron'?.61:id==='glass'?.28:.95,metalness:id==='iron'?.28:0}));
   }
  }
  geometry(w,h,d){
