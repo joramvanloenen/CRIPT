@@ -20,9 +20,10 @@ class Audio{
   const src=this.ctx.createBufferSource(),fil=this.ctx.createBiquadFilter(),g=this.ctx.createGain();src.buffer=buf;fil.type='lowpass';fil.frequency.value=filterHz;g.gain.value=volume;src.connect(fil);fil.connect(g);g.connect(this.master);src.start();}
  effect(name){switch(name){
   case 'step':this.noise(.078,.045,420);break;
-  case 'swing':this.noise(.18,.13,800);this.tone(155,.13,'triangle',.045,.35);break;
-  case 'heavy':this.noise(.27,.15,580);this.tone(110,.27,'sawtooth',.085,.23);break;
-  case 'hit':this.noise(.12,.12,900);this.tone(95,.13,'square',.048,.5);break;
+  case 'swing':this.noise(.105,.105,1450);this.tone(310,.095,'triangle',.024,.38);break;
+  case 'heavy':this.noise(.19,.16,830);this.tone(130,.22,'sawtooth',.065,.25);break;
+  case 'hit':this.noise(.11,.13,1050);this.tone(160,.11,'triangle',.055,.29);break;
+  case 'hitHeavy':this.noise(.22,.22,660);this.tone(88,.22,'triangle',.115,.22);this.tone(220,.075,'square',.035,.33);break;
   case 'spell':this.tone(480,.55,'sine',.075,1.7);this.tone(770,.25,'triangle',.03,.54);break;
   case 'bell':this.tone(165,1.9,'sine',.08,.92);this.tone(248,1.4,'sine',.04,.87);this.tone(330,1,'sine',.022,.84);break;
   case 'drip':this.tone(380,.11,'sine',.025,1.5);break;
@@ -38,7 +39,8 @@ const audio=new Audio();C.audio=audio;
 const game=C.game;
 function wrap(method,after){const original=game[method].bind(game);game[method]=function(...args){const result=original(...args);after(...args);return result}}
 wrap('start',()=>{audio.initialize();audio.lastX=game.hero.x;audio.lastZ=game.hero.z;audio.effect('bell')});
-wrap('strike',heavy=>{if(game.running)audio.effect(heavy?'heavy':'swing')});
+// Whoosh now fires at the animation release key, not on button-down.
+// Invalid, stamina-blocked and buffered inputs remain silent.
 wrap('spell',()=>{if(game.running)audio.effect('spell')});
 wrap('hurt',()=>audio.effect('hurt'));
 wrap('interact',()=>audio.effect('interact'));
