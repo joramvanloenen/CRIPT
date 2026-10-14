@@ -197,5 +197,31 @@ function maskFromRGBA(pixels,width,height,{size=72,background='auto',alphaThresh
  }
  return out;
 }
-C.MeshVision={VIEWS,render,coverage,compare,evaluate,targetFromRecipe,refine,change,colorPixels,maskFromRGBA};
+// Curated art-direction targets. They are intentionally distinct from the
+// default modeling recipes, so evaluation cannot self-grade identical images.
+// Artists can replace any target with a reference model or a PNG silhouette.
+const targetStyles={
+ 'chipped-stone':{width:1.32,height:.71,depth:.59,bevel:.08,erosion:.34},
+ 'gothic-voussoir':{depth:.56,bevel:.043,outline:[[-.37,-.25],[.35,-.25],[.57,.25],[-.53,.25]]},
+ 'fluted-column':{height:4.15,radius:.38,flutes:16,fluteDepth:.065,segments:36},
+ 'vault-rib':{span:5.6,rise:2.55,thickness:.23,segments:20},
+ 'carved-capital':{width:1.01,height:.46,depth:.79,bevel:.073},
+ 'stone-sarcophagus':{width:1.31,height:.89,depth:2.52,erosion:.29},
+ 'urn':{width:1.31,height:1.61,segments:32},
+ 'bell':{width:1.18,height:1.65,segments:36}
+};
+const typeStyles={
+ ashlar:{bevel:.066,erosion:.29},
+ slab:{erosion:.26},
+ column:{fluteDepth:.06,flutes:14},
+ sarcophagus:{width:1.2,height:.84},
+ urn:{width:1.17},
+ bell:{width:1.15},
+ rib:{rise:2.1}
+};
+function artRecipe(recipe){
+ const patch=targetStyles[recipe.id]||typeStyles[recipe.type]||{};
+ return{...recipe,...patch,name:(recipe.name||recipe.type)+' / ART TARGET'};
+}
+C.MeshVision={VIEWS,render,coverage,compare,evaluate,targetFromRecipe,refine,change,colorPixels,maskFromRGBA,artRecipe,targetStyles};
 })();
