@@ -1,4 +1,4 @@
-/* CRIPT 3D runtime — grid exploration + seamless free combat */
+/* CRIPT 3D runtime — continuous first-person exploration and combat */
 (function(){
 'use strict';
 const C=window.Cript, T=window.THREE, $=id=>document.getElementById(id);
@@ -17,7 +17,7 @@ constructor(){
  this.hero=this.freshHero();this.weaponView=new T.Group();this.camera.add(this.weaponView);this.makeWeapon();
  this.buildWorld();this.resetActors();this.bind();this.resize();window.addEventListener('resize',()=>this.resize());requestAnimationFrame(t=>this.loop(t));
 }
-freshHero(){return{x:4.5*1.8,z:4.5*1.8,yaw:Math.PI/2,pitch:0,vx:0,vz:0,hp:100,st:100,mp:80,weapon:'rust',souls:0,kills:0,journal:false,step:null,wait:0,attack:0,dodge:0,injured:0,regen:0,safe:0,veil:0}}
+freshHero(){return{x:4.5*1.8,z:4.5*1.8,yaw:Math.PI/2,pitch:0,vx:0,vz:0,hp:100,st:100,mp:80,weapon:'rust',souls:0,kills:0,journal:false,attack:0,dodge:0,injured:0,regen:0,veil:0}}
 sceneTexture(asset){if(!asset)return null;if(this.images[asset.id])return this.images[asset.id];const t=new T.CanvasTexture(C.spriteCanvas(asset));t.magFilter=T.NearestFilter;t.minFilter=T.NearestFilter;t.wrapS=T.RepeatWrapping;t.wrapT=T.RepeatWrapping;t.colorSpace=T.SRGBColorSpace;this.images[asset.id]=t;return t}
 pos(room,x,z){return{x:(room.gx*9+x+.5)*1.8,z:(room.gz*9+z+.5)*1.8}}
 buildWorld(){
@@ -85,7 +85,7 @@ createSecretGates(){
   const across=secret.side==='E'||secret.side==='W';
   if(across)g.rotation.y=Math.PI/2;
   const mat=this.architecture.mats.get(from.theme==='sand'?'goldstone':'stone');
-  const stone=new T.Mesh(new T.BoxGeometry(1.82,3.28,.29),mat);
+  const stone=new T.Mesh(this.architecture.geometry(1.82,3.28,.29).geometry,mat);
   stone.position.y=1.64;g.add(stone);
   const crack=new T.MeshBasicMaterial({color:0x243332,transparent:true,opacity:.65,depthWrite:false});
   for(let i=0;i<4;i++){
