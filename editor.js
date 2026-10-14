@@ -3,7 +3,7 @@
 const modes={dungeon:'rooms',room:'rooms',texture:'textures',character:'characters',prop:'props',weapon:'weapons',vfx:'vfx',encounter:'encounters',logic:'logic',atmosphere:'atmosphere'};
 const defaultInk='#75978e';
 class Editor{
-constructor(){this.mode='dungeon';this.selected={};this.tool='tile';this.tile='stone';this.actor='skeleton';this.prop='urn';this.color=defaultInk;this.painting=false;this.mirror=false;this.erase=false;this.fill=false;this.brush=1;this.undoStack=[];this.redoStack=[];this.canvas=$('editCanvas');this.ctx=this.canvas.getContext('2d',{willReadFrequently:true});this.ctx.imageSmoothingEnabled=false;this.bind();this.selectDefault();this.makePreview();this.refresh();this.animate();}
+constructor(){this.mode='dungeon';this.materialView='paint';this.selected={};this.tool='tile';this.tile='stone';this.actor='skeleton';this.prop='urn';this.color=defaultInk;this.painting=false;this.mirror=false;this.erase=false;this.fill=false;this.brush=1;this.undoStack=[];this.redoStack=[];this.canvas=$('editCanvas');this.ctx=this.canvas.getContext('2d',{willReadFrequently:true});this.ctx.imageSmoothingEnabled=false;this.bind();this.selectDefault();this.makePreview();this.refresh();this.animate();}
 selectDefault(){for(const [mode,collection]of Object.entries(modes)){const id=Object.keys(this.collection(mode))[0];if(!this.selected[mode]||!this.collection(mode)[this.selected[mode]])this.selected[mode]=id;}}
 collection(mode=this.mode){return mode==='dungeon'||mode==='room'?C.project.rooms:mode==='logic'?C.project.logic:mode==='encounter'?C.project.encounters:C.project.assets[modes[mode]]||{}}
 asset(){return this.collection()[this.selected[this.mode]]||Object.values(this.collection())[0]}
@@ -25,7 +25,7 @@ $('colorPicker').oninput=e=>{this.color=e.target.value;this.palette()};$('brushS
 $('mirrorBtn').onclick=()=>{this.mirror=!this.mirror;$('mirrorBtn').style.color=this.mirror?'#eac489':''};
 $('fillBtn').onclick=()=>{this.fill=!this.fill;$('fillBtn').style.color=this.fill?'#eac489':''};
 $('eraseBtn').onclick=()=>{this.erase=!this.erase;$('eraseBtn').style.color=this.erase?'#eac489':''};
-this.canvas.addEventListener('pointerdown',e=>{this.canvas.setPointerCapture(e.pointerId);this.painting=true;this.checkpoint();this.paint(e)});
+this.canvas.addEventListener('pointerdown',e=>{if(this.mode==='texture'&&this.materialView!=='paint')return;this.canvas.setPointerCapture(e.pointerId);this.painting=true;this.checkpoint();this.paint(e)});
 this.canvas.addEventListener('pointermove',e=>{this.coords(e);if(this.painting)this.paint(e)});
 const finish=()=>{if(!this.painting)return;this.painting=false;this.change()};
 this.canvas.addEventListener('pointerup',finish);this.canvas.addEventListener('pointercancel',finish);
@@ -73,7 +73,25 @@ renderInspector(){const a=this.asset(),body=$('inspectorBody');body.replaceChild
  this.button(body,'▶ TEST THIS ROOM',()=>{this.view('game');C.game.refresh();C.game.playtest(a.id)})}
  if(['texture','character','prop'].includes(this.mode)){this.heading(body,'PIXEL ART','Paint directly on the canvas. Right-click erases; brushes, flood fill and mirroring use one undo history.');
  this.field(body,'WIDTH',a,'width','number');this.field(body,'HEIGHT',a,'height','number');this.button(body,'RESIZE PIXELS TO DIMENSIONS',()=>{this.checkpoint();this.resizePixels(a);this.change()});
- if(this.mode==='texture'){this.field(body,'SOLID COLLISION',a,'solid','checkbox')}
+ if(this.mode==='texture'){
+   this.field(body,'SOLID COLLISION',a,'solid','checkbox');
+   this.heading(body,'PROCEDURAL STONE SURFACE','A mathematically bonded stone pattern drives diffuse, mortar depth, normal relief, erosion and roughness. Pixel painting stays intact as an optional overlay.');
+   if(!a.materialRecipe){
+     this.button(body,'EDIT STONE LAYERS',()=>{this.checkpoint();a.materialRecipe=C.StoneMaterials.recipeFor(a);this.change()});
+   }else{
+     const r=a.materialRecipe;
+     this.field(body,'LAYOUT',r,'type','select',['wall','floor']);
+     for(const [title,key] of [['ROWS OF STONE','courses'],['BLOCKS PER ROW','columns'],['MORTAR DEPTH','depth'],['RELIEF STRENGTH','relief'],['LAYERED NOISE','noise'],['EROSION','erosion'],['PIXEL PAINT OVERLAY','overlay'],['RANDOM SEED','seed']]){
+       this.field(body,title,r,key,'number');
+     }
+   }
+   this.heading(body,'MATERIAL CHANNELS','Switch between the authored paint layer and the generated maps; the same textures are used live in the 3D rooms.');
+   for(const [value,label] of [['paint','Paint layer'],['albedo','Diffuse'],['normal','Normal'],['roughness','Roughness'],['height','Height']]){
+     const button=this.button(body,(this.materialView===value?'● ':'○ ')+label,()=>{this.materialView=value;this.draw();this.renderInspector()});
+     if(this.materialView===value)button.style.borderColor='#d0aa70';
+   }
+   if(this.materialView!=='paint')this.button(body,'EXPORT THIS CHANNEL PNG',()=>{const link=document.createElement('a');link.download=a.id+'-'+this.materialView+'.png';link.href=this.canvas.toDataURL('image/png');link.click()});
+ }
  if(this.mode==='character'){this.field(body,'HEALTH',a,'hp','number');this.field(body,'DAMAGE',a,'damage','number');this.field(body,'MOVEMENT SPEED',a,'speed','number');this.field(body,'AGGRO RANGE',a,'aggro','number');this.field(body,'AI STYLE',a,'ai','select',['chase','wander','charge']);this.field(body,'SOUL REWARD',a,'reward','number')}
  if(this.mode==='prop'){this.field(body,'SOLID',a,'solid','checkbox');this.field(body,'BREAKABLE',a,'breakable','checkbox');this.field(body,'DURABILITY',a,'hp','number');this.field(body,'LOOT',a,'loot','select',['','weapon','journal','magic'])}
  this.button(body,'↓ EXPORT PIXEL PNG',()=>{const png=C.spriteCanvas(a).toDataURL('image/png'),link=document.createElement('a');link.href=png;link.download=a.id+'.png';link.click()})}
@@ -100,6 +118,15 @@ draw(){const ctx=this.ctx,a=this.asset();ctx.clearRect(0,0,576,576);ctx.fillStyl
  if(this.mode==='dungeon'){ctx.font='12px monospace';ctx.textAlign='center';for(const r of Object.values(C.project.rooms)){const x=50+r.gx*120,y=50+r.gz*120;ctx.fillStyle=r.id===this.selected.dungeon?'#806a49':'#283e3d';ctx.fillRect(x,y,105,105);ctx.strokeStyle='#83988a';ctx.strokeRect(x+.5,y+.5,104,104);ctx.fillStyle='#ead2a5';ctx.fillText(r.name.slice(0,14),x+52,y+50);ctx.fillStyle='#9bc6bd';ctx.fillText(r.category.toUpperCase(),x+52,y+69);ctx.strokeStyle='#c3a66a';ctx.lineWidth=6;ctx.beginPath();if(r.doors.includes('E')){ctx.moveTo(x+105,y+52);ctx.lineTo(x+120,y+52)}if(r.doors.includes('S')){ctx.moveTo(x+52,y+105);ctx.lineTo(x+52,y+120)}ctx.stroke()}return}
  if(this.mode==='room'){for(let z=0;z<9;z++)for(let x=0;x<9;x++){const id=a.tiles[z*9+x],tex=C.project.assets.textures[id];ctx.fillStyle=id==='stone'?'#314c49':id==='moss'?'#35594b':id==='goldstone'?'#95704b':'#53655a';ctx.fillRect(x*64,z*64,64,64);if(tex){const img=C.spriteCanvas(tex);ctx.imageSmoothingEnabled=false;ctx.globalAlpha=.57;ctx.drawImage(img,x*64,z*64,64,64);ctx.globalAlpha=1}ctx.strokeStyle='#09171b66';ctx.strokeRect(x*64+.5,z*64+.5,64,64)}
  for(const o of a.props||[]){const p=C.project.assets.props[o.kind];if(p)ctx.drawImage(C.spriteCanvas(p),o.x*64+12,o.z*64+12,40,40)}for(const o of a.enemies||[]){const p=C.project.assets.characters[o.kind];if(p)ctx.drawImage(C.spriteCanvas(p),o.x*64+12,o.z*64+12,40,40)}ctx.strokeStyle='#e4bb76';ctx.strokeRect(4*64+2,4*64+2,60,60);return}
+ if(this.mode==='texture'&&this.materialView!=='paint'){
+   const map=C.StoneMaterials.build(a,{size:128});
+   const channel=this.materialView;
+   const c=document.createElement('canvas');c.width=c.height=map.size;
+   const src=c.getContext('2d'),image=src.createImageData(map.size,map.size);
+   if(channel==='albedo'||channel==='normal'||channel==='roughness')image.data.set(channel==='albedo'?map.albedo:channel==='normal'?map.normals:map.roughness);
+   else for(let i=0;i<map.heightMap.length;i++){const v=clamp(Math.round((map.heightMap[i]+.33)*310),0,255),at=i*4;image.data[at]=image.data[at+1]=image.data[at+2]=v;image.data[at+3]=255}
+   src.putImageData(image,0,0);ctx.imageSmoothingEnabled=false;ctx.drawImage(c,0,0,576,576);return;
+ }
  if(['texture','character','prop'].includes(this.mode)){const w=a.width||16,h=a.height||16,sz=Math.min(576/w,576/h);for(let y=0;y<h;y++)for(let x=0;x<w;x++){ctx.fillStyle=(x+y)%2?'#203137':'#263b3b';ctx.fillRect(x*sz,y*sz,sz,sz);if(a.pixels[y*w+x]){ctx.fillStyle=a.pixels[y*w+x];ctx.fillRect(x*sz,y*sz,sz,sz)}if(w<=32){ctx.strokeStyle='#121f214d';ctx.strokeRect(x*sz+.5,y*sz+.5,sz,sz)}}return}
  ctx.fillStyle='#8caa99';ctx.textAlign='center';ctx.font='22px Georgia';ctx.fillText(a.name.toUpperCase(),288,90);
  if(this.mode==='weapon'){ctx.fillStyle=a.color;ctx.save();ctx.translate(288,340);ctx.rotate(-.45);ctx.fillRect(-16,-160,32,210);ctx.fillStyle='#9a7758';ctx.fillRect(-8,45,16,100);ctx.fillRect(-80,28,160,14);ctx.restore();ctx.font='14px monospace';ctx.fillText('TIER '+a.tier+' · '+a.damage+' DAMAGE · '+a.stamina+' STAMINA',288,505)}
