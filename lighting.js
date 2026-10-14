@@ -11,7 +11,7 @@ for(let i=0;i<init.length;i+=4){init[i]=30;init[i+1]=36;init[i+2]=43;init[i+3]=2
 class BakedLighting{
  constructor(scene,world,project){
   this.scene=scene;this.world=world;this.project=project;
-  this.uniform={value:null};this.timeUniform={value:0};this.materials=[];this.moons=[];
+  this.uniform={value:null};this.timeUniform={value:0};this.fogColor={value:new T.Color(0x2b504d)};this.fogDensity={value:.36};this.materials=[];this.moons=[];
   this.worker=null;this.generation=0;this.timer=0;
   this.texture=this.makeTexture(init);this.uniform.value=this.texture;
   this.addMoonlight();
@@ -25,10 +25,12 @@ class BakedLighting{
   if(!material?.isMeshStandardMaterial)return;
   if(material.userData?.criptBakedGI)return;
   material.userData=material.userData||{};material.userData.criptBakedGI=true;
-  const prev=material.onBeforeCompile,gi=this.uniform;
+  const prev=material.onBeforeCompile,gi=this.uniform,fogColor=this.fogColor,fogDensity=this.fogDensity;
   material.onBeforeCompile=shader=>{
    if(prev)prev(shader);
    shader.uniforms.criptGIAtlas=gi;
+   shader.uniforms.criptHeightFogColor=fogColor;
+   shader.uniforms.criptHeightFogDensity=fogDensity;
    shader.vertexShader='varying vec3 vCriptBakedWorld;\n'+shader.vertexShader;
    shader.vertexShader=shader.vertexShader.replace('#include <project_vertex>',[
     '#include <project_vertex>',
@@ -41,6 +43,8 @@ class BakedLighting{
    shader.fragmentShader=[
     'varying vec3 vCriptBakedWorld;',
     'uniform sampler2D criptGIAtlas;',
+    'uniform vec3 criptHeightFogColor;',
+    'uniform float criptHeightFogDensity;',
     'vec4 criptSampleBakedLight(vec3 p){',
     '  float x=clamp(p.x/.9,.5,71.5),z=clamp(p.z/.9,.5,71.5);',
     '  float level=clamp((p.y-.27)/1.32,0.0,7.0);',
@@ -56,6 +60,16 @@ class BakedLighting{
     'reflectedLight.indirectDiffuse*=mix(1.0,criptBake.a,.84);',
     'reflectedLight.indirectDiffuse+=criptBake.rgb*diffuseColor.rgb*1.60;'
    ].join('\n'));
+   // Height fog is part of the world material, not a full-screen blur pass.
+   // It pools against low masonry, revealing silhouettes above the mist.
+   shader.fragmentShader=shader.fragmentShader.replace('#include <fog_fragment>',[
+    '#include <fog_fragment>',
+    'float criptFogHeight=exp(-max(0.0,vCriptBakedWorld.y-.18)*1.45);',
+    'float criptFogDistance=1.0-exp(-distance(vCriptBakedWorld,cameraPosition)*.082);',
+    'float criptFog=clamp(criptFogHeight*criptFogDistance*criptHeightFogDensity,0.0,.68);',
+    'gl_FragColor.rgb=mix(gl_FragColor.rgb,criptHeightFogColor,criptFog);'
+   ].join('\\n'));
+
   };
   const oldKey=material.customProgramCacheKey?.bind(material);
   material.customProgramCacheKey=()=>String(oldKey?oldKey():'')+'|cript-baked-gi-v2';
@@ -199,6 +213,11 @@ class BakedLighting{
       samples:R.nx*R.nz*R.ny,occlusions:0}}},true);
    else runWorker();
   }).catch(runWorker);
+ }
+ setFog(atmosphere){
+  if(!atmosphere)return;
+  this.fogColor.value.set(atmosphere.fog||'#284744');
+  this.fogDensity.value=Math.max(0,Math.min(1,Number(atmosphere.heightFog)||.4));
  }
  update(x,z,time){
   this.timeUniform.value=time;
