@@ -25,4 +25,7 @@ const obj=forge.asObj(rib,'Test Rib');
 assert.ok(obj.includes('vt ')&&obj.includes('vn ')&&obj.includes('f '),'OBJ lacks UV/normals/faces');
 assert.throws(()=>forge.build({type:'eval',code:'alert(1)'}),/Unsupported/);
 assert.throws(()=>forge.build({type:'profile',outline:[[0,0],[1,0],[2,0]]}),/Zero-area/);
+const agent=require('../tools/mesh-agent.cjs');
+const sample=agent.previewSVG(forge.build(forge.presets['chipped-stone']),'Ashlar');
+assert.ok(sample.includes('<svg')&&sample.includes('<polygon'),'Headless model preview should be an SVG with modeled faces');
 console.log('PASS: '+Object.keys(forge.presets).length+' watertight modeled assets; profile extrusion; bevels; lathe; curved sweep; OBJ; 12-step audited refinement');
