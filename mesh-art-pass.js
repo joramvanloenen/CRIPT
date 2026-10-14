@@ -232,6 +232,8 @@ const recipes={
     ]
   }
 };
+const originalDefaults=JSON.parse(JSON.stringify(F.presets));
+F.legacyPresets=originalDefaults;
 const scores={
   "chipped-stone": {
     "before": 0.875169,
