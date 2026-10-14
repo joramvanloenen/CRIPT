@@ -32,6 +32,8 @@ class Attribute{
  setY(i,n){if(n>1)verticalUVRepeats++;this.data[i]=n}
 }
 class Geometry extends Obj{
+ setAttribute(name,attr){this.attributes[name]=attr;return this}
+ computeBoundingSphere(){}
  constructor(...args){super();this.args=args;this.attributes={uv:new Attribute(),normal:new Attribute(),position:new Attribute()};this.attributes.normal.data=Array(24).fill(0);this.attributes.position.data=Array(24).fill(Math.max(1,typeof args[0]==='number'?args[0]:1,typeof args[1]==='number'?args[1]:1,typeof args[2]==='number'?args[2]:1)/2)}
  getAttribute(k){return this.attributes[k]}
  translate(){return this}
@@ -42,14 +44,18 @@ class Fog extends Obj{constructor(){super();this.color=new Color();this.density=
 class Shape{moveTo(){}lineTo(){}closePath(){}}
 class Renderer{constructor(){this.domElement=el();this.outputColorSpace='';}
  setPixelRatio(){}setSize(){}render(){}}
+class FloatAttribute {
+ constructor(array,itemSize){this.array=Float32Array.from(array);this.itemSize=itemSize;this.count=this.array.length/itemSize;}
+ getX(i){return this.array[i*this.itemSize]}getY(i){return this.array[i*this.itemSize+1]}getZ(i){return this.array[i*this.itemSize+2]}
+}
 class Texture{dispose(){}}
 class Spot extends Obj{constructor(){super();this.target=new Obj()}}
 const T={Scene:Obj,Group:Obj,PerspectiveCamera:Obj,WebGLRenderer:Renderer,HemisphereLight:Obj,PointLight:Obj,InstancedMesh:Obj,Mesh:Obj,MeshLambertMaterial:Material,MeshBasicMaterial:Material,MeshStandardMaterial:Material,ShaderMaterial:Material,SpotLight:Spot,DataTexture:Texture,Vector2:class{constructor(x,y){this.x=x;this.y=y}},
- BoxGeometry:Geometry,PlaneGeometry:Geometry,CylinderGeometry:Geometry,ConeGeometry:Geometry,IcosahedronGeometry:Geometry,DodecahedronGeometry:Geometry,TetrahedronGeometry:Geometry,ExtrudeGeometry:Geometry,Object3D:Obj,CanvasTexture:Texture,
+ BufferGeometry:Geometry,Float32BufferAttribute:FloatAttribute,BoxGeometry:Geometry,PlaneGeometry:Geometry,CylinderGeometry:Geometry,ConeGeometry:Geometry,IcosahedronGeometry:Geometry,DodecahedronGeometry:Geometry,TetrahedronGeometry:Geometry,ExtrudeGeometry:Geometry,Object3D:Obj,CanvasTexture:Texture,
  Shape,FogExp2:Fog,Color,SRGBColorSpace:1,NearestFilter:2,NearestMipmapNearestFilter:2,RepeatWrapping:3,DoubleSide:4,FrontSide:0,RGBAFormat:1023,UnsignedByteType:5121};
 const window={THREE:T,addEventListener(){}},localStorage={getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v)},performance={now:()=>0};
 const sandbox={window,document,localStorage,performance,Math,setTimeout,clearTimeout,requestAnimationFrame(){},console,confirm:()=>true,alert(){}};
-for(const file of ['data.js','weapons.js','procedural-stone.js','architecture.js','lighting-bake-worker.js','lighting.js','game.js']){
+for(const file of ['mesh-forge.js','data.js','weapons.js','procedural-stone.js','architecture.js','lighting-bake-worker.js','lighting.js','game.js']){
  vm.runInNewContext(fs.readFileSync(file,'utf8'),sandbox,{filename:file});
 }
 const C=window.Cript,game=C.game;
@@ -73,6 +79,7 @@ assert.ok(shader.uniforms.criptGIAtlas===C.game.lighting.uniform,'Shared GI atla
 assert.ok(C.masonryStats.arches>20,'Masonry voussoirs not built');
 assert.ok(C.masonryStats.vaults>40,'Vault ceiling geometry not built');
 assert.ok(C.masonryStats.rubble>0,'Aged rubble missing');
+assert.ok(C.masonryStats.modeled>40,'Forged meshes must be present in the actual 3D world');
 assert.ok(C.masonryStats.wallBaseDebris>25,'Wall and floor junctions need substantial stone fragments');
 assert.ok(C.Masonry.config(C.project.rooms['room-15']).height>7,'Boss chamber must have tall ceiling');
 const boss=C.project.rooms['room-15'],bossX=(boss.gx*9+4.5)*1.8,bossZ=(boss.gz*9+4.5)*1.8;
