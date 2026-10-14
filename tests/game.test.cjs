@@ -80,6 +80,18 @@ assert.ok(C.masonryStats.arches>20,'Masonry voussoirs not built');
 assert.ok(C.masonryStats.vaults>40,'Vault ceiling geometry not built');
 assert.ok(C.masonryStats.rubble>0,'Aged rubble missing');
 assert.ok(C.masonryStats.modeled>40,'Forged meshes must be present in the actual 3D world');
+assert.ok(C.masonryStats.galleries>=20,'Room construction should include visible wall-embedded Gothic gallery arches');
+assert.equal(C.masonryStats.heroPortals,1,'First room should have a directly visible monumental entry arch');
+assert.ok(C.masonryStats.ribbedBays>=4,'Hero chambers need modeled overhead ribs');
+const legacyWorld=C.copy(C.project);
+legacyWorld.assets.meshes['chipped-stone']=C.copy(C.MeshForge.legacyPresets['chipped-stone']);
+legacyWorld.assets.meshes.urn=C.copy(C.MeshForge.legacyPresets.urn);
+legacyWorld.assets.meshes.bell={...C.copy(C.MeshForge.legacyPresets.bell),width:1.77};
+const migrated=C.validate(legacyWorld);
+assert.equal(migrated.assets.meshes['chipped-stone'].artPass,'gothic-01','Older stock masonry must migrate visibly');
+assert.equal(migrated.assets.meshes.urn.artPass,'gothic-01','Older stock props must migrate visibly');
+assert.equal(migrated.assets.meshes.bell.width,1.77,'User-customized meshes must never be silently overwritten');
+
 assert.ok(C.masonryStats.wallBaseDebris>25,'Wall and floor junctions need substantial stone fragments');
 assert.ok(C.Masonry.config(C.project.rooms['room-15']).height>7,'Boss chamber must have tall ceiling');
 const boss=C.project.rooms['room-15'],bossX=(boss.gx*9+4.5)*1.8,bossZ=(boss.gz*9+4.5)*1.8;
