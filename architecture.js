@@ -218,6 +218,7 @@ class Masonry{
    for(let z=1;z<8;z++)for(let x=1;x<8;x++){
     const [cx,cz]=this.xz(room,x,z);
     if(this.tile(room,x,z)==='stone')continue;
+    if(room.skylight&&x>=3&&x<=5&&z>=3&&z<=5)continue;
     this.box(room,mat,cx,height+.03,cz,S-.026,.25,S-.026);
    }
    // Low barrel rooms use crossbeams/corbels instead of giant church ribs.
@@ -231,6 +232,8 @@ class Masonry{
   for(let bay=0;bay<3;bay++){
    const z=centerZ-4.2+bay*4.2;
    for(let i=0;i<segments;i++){
+    // A weathered-away crown in the central bay exposes a real skylight.
+    if(room.skylight&&bay===1&&(i===5||i===6))continue;
     const xa=-half+i*step,xb=xa+step;
     const ya=spring+rise*Math.sqrt(Math.max(0,1-(xa/half)**2));
     const yb=spring+rise*Math.sqrt(Math.max(0,1-(xb/half)**2));
@@ -241,6 +244,7 @@ class Masonry{
   }
   const ribPlaces=[centerZ-6.24,centerZ-2.1,centerZ+2.1,centerZ+6.24];
   for(const z of ribPlaces)for(let i=0;i<segments;i++){
+   if(room.skylight&&Math.abs(z-centerZ)<2.2&&(i===5||i===6))continue;
    const xa=-half+i*step,xb=xa+step,ya=spring+rise*Math.sqrt(Math.max(0,1-(xa/half)**2));
    const yb=spring+rise*Math.sqrt(Math.max(0,1-(xb/half)**2));
    const angle=Math.atan2(yb-ya,xb-xa),len=Math.hypot(step,yb-ya);
