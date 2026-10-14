@@ -152,7 +152,7 @@ move(dx,dz){const p=this.hero;if(this.can(p.x+dx,p.z))p.x+=dx;if(this.can(p.x,p.
 turn(dir){if(!this.running||this.paused)return;this.hero.yaw=(this.hero.yaw+dir*.22+TAU)%TAU}
 gateBlocks(x,z,r=0){
  for(const gate of this.secretGates||[]){
-  if(gate.open)return false;
+  if(gate.open)continue;
   const sideways=gate.side==='E'||gate.side==='W';
   if(Math.abs(x-gate.x)<(sideways?.23:.92)+r&&
      Math.abs(z-gate.z)<(sideways?.92:.23)+r)return true;
