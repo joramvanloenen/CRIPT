@@ -224,9 +224,9 @@ class Masonry{
   }
   if(n>.4){this.box(room,'soot',cx+.42,1.1,cz+.14,.017,.45,.065,0,-.22)}
  }
- arch(room,cx,cz,yaw=0,scale=1,base=2.04,material=null){
+ arch(room,cx,cz,yaw=0,scale=1,base=2.04,material=null,styleOverride=null){
   const mat=(material||this.palette(room))+':cut',r=.87*scale,outer=1.16*scale,segments=11;
-  const style=config(room).archStyle;
+  const style=styleOverride||config(room).archStyle;
   // Left and right springers rest on square piers; the key stone locks the arch.
   const side=x=>{const xx=cx+Math.cos(yaw)*x,zz=cz-Math.sin(yaw)*x;
    for(let i=0;i<5;i++){const cy=(i+.5)*base/5;
@@ -426,6 +426,67 @@ class Masonry{
    this.box(room,'wood',x-3.5,1.0,z-1.8,3.9,.18,.2,0,-.25);
   }
  }
+ gallery(room,cfg){
+  // A substantial new architectural layer, present even in already-saved worlds.
+  // Gothic blind arches, load-bearing engaged shafts and stone ribs deliberately
+  // break large stretches of planar wall; no primitive tile is treated as a prop.
+  const [x,z]=this.xz(room,4,4),mat=this.palette(room),h=cfg.height;
+  const monumental=['entrance','shrine','boss','sanctuary'].includes(room.category);
+  const scale=monumental?1.16:.91;
+  const base=Math.min(monumental?2.58:1.98,h-(monumental?1.85:1.40));
+  const cells=[
+   {dir:'N',yaw:0,cx:x,cz:(room.gz*9+1.18)*S},
+   {dir:'S',yaw:0,cx:x,cz:(room.gz*9+7.82)*S},
+   {dir:'W',yaw:Math.PI/2,cx:(room.gx*9+1.18)*S,cz:z},
+   {dir:'E',yaw:Math.PI/2,cx:(room.gx*9+7.82)*S,cz:z}
+  ];
+  const depth=monumental?2:1;
+  for(const side of cells){
+   // Existing doorways stay unobstructed, including hidden door reveals.
+   if((room.doors||[]).includes(side.dir))continue;
+   this.arch(room,side.cx,side.cz,side.yaw,scale,base,null,'pointed');
+   const transverse=side.yaw===0;
+   for(const sign of [-1,1]){
+    const offset=sign*scale*1.38;
+    const px=side.cx+(transverse?offset:0),pz=side.cz+(transverse?0:offset);
+    const shaftHeight=Math.min(h-.25,base+1.35*scale);
+    this.modeled(room,mat,'fluted-column',px,0,pz,.38*scale,shaftHeight,.38*scale,side.yaw);
+    this.modeled(room,'ivory','carved-capital',px,shaftHeight-.10,pz,.66*scale,.30,.66*scale,side.yaw);
+   }
+   const head=base+1.2*scale;
+   this.modeled(room,'ivory','vault-rib',side.cx,head,side.cz,
+    scale*2.35,.38,scale*.27,side.yaw);
+   this.count.galleries=(this.count.galleries||0)+1;
+  }
+  // First room's huge ribbed portal is directly in the initial eastward
+  // field of view. This is purpose-built visual architecture, not an editor-only asset.
+  if(room.category==='entrance'){
+   const portalX=x+3.8,portalZ=z;
+   this.arch(room,portalX,portalZ,Math.PI/2,1.42,2.32,null,'pointed');
+   for(const dz of [-2.05,2.05]){
+    this.modeled(room,mat,'fluted-column',portalX,0,portalZ+dz,.55,3.48,.55,Math.PI/2);
+    this.modeled(room,'ivory','carved-capital',portalX,3.44,portalZ+dz,.86,.34,.86,Math.PI/2);
+   }
+   // A pointed ceremonial lintel and key stone visible before the player moves.
+   this.modelledPortalInscription(room,portalX,portalZ,4.18);
+   this.count.heroPortals=(this.count.heroPortals||0)+1;
+  }
+  // Taller rooms also carry cross-vault ribs between the pillars, high overhead.
+  if(monumental){
+   for(const side of [-1,1]){
+    this.modeled(room,'trim','vault-rib',x,h-.69,z+side*3.0,
+      9.2,2.3,.29,0);
+    this.count.ribbedBays=(this.count.ribbedBays||0)+1;
+   }
+  }
+ }
+ modelledPortalInscription(room,x,z,height){
+  const mat=this.palette(room);
+  this.modeled(room,'ivory','gothic-voussoir',x,height,z,.67,.58,.36,Math.PI/2);
+  for(const dz of [-1.1,-.55,0,.55,1.1]){
+   this.modeled(room,mat,'chipped-stone',x,height+.55,z+dz,.32,.18,.23,Math.PI/2);
+  }
+ }
  weather(room,cfg){
   const mat=this.palette(room),decay=cfg.decay;
   for(let z=1;z<8;z++)for(let x=1;x<8;x++){
@@ -474,6 +535,7 @@ class Masonry{
   for(const dir of room.doors||[])this.doorway(room,dir,cfg);
   this.ceiling(room,cfg);
   this.purpose(room,cfg);
+  this.gallery(room,cfg);
   this.weather(room,cfg);
  }
  finish(){
