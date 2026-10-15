@@ -5,19 +5,38 @@
 'use strict';
 const C=window.Cript,T=window.THREE;
 if(!C||!T)return;
-const R={nx:72,nz:72,ny:8,step:.9,y0:.27,dy:1.32};
-const init=new Uint8Array(R.nx*R.nz*R.ny*4);
-for(let i=0;i<init.length;i+=4){init[i]=30;init[i+1]=36;init[i+2]=43;init[i+3]=235;}
+const createSurfaceAtlasShader=L=>[
+ 'vec4 criptSampleBakedLight(vec3 p,vec3 n){',
+ 'vec2 room=floor(clamp(p.xz / 16.2,vec2(0.0),vec2(3.9999)));',
+ 'vec2 local=clamp(p.xz-room*16.2,vec2(0.0),vec2(16.2));',
+ 'vec3 faceAbs=abs(n);',
+ 'float face=0.0;',
+ 'if(faceAbs.y>=0.5 && faceAbs.y>=max(faceAbs.x,faceAbs.z)*0.85)face=n.y>=0.0?0.0:1.0;',
+ 'else if(faceAbs.x>faceAbs.z)face=n.x>=0.0?2.0:3.0;',
+ 'else face=n.z>=0.0?4.0:5.0;',
+ 'float row=floor(face/2.0),col=mod(face,2.0);',
+ 'vec2 chartOrigin=vec2(room.x*'+L.cellW+'.0+col*'+L.patchW+'.0+'+L.padding+'.0,',
+ ' room.y*'+L.cellH+'.0+(row<0.5?0.0:(row<1.5?'+L.planeH+'.0:'+ (L.planeH+L.wallH)+'.0))+'+L.padding+'.0);',
+ 'vec2 metric=face<1.5?local:(face<3.5?vec2(local.y,p.y):vec2(local.x,p.y));',
+ 'metric=clamp(metric,vec2(0.0),vec2('+L.roomMeters+','+L.maxHeight+'));',
+ 'vec2 maximum=vec2('+ (L.floorPx-1)+'.0,row<0.5?'+(L.floorPx-1)+'.0:'+(L.wallPx-1)+'.0);',
+ 'vec2 coord=chartOrigin+clamp(metric*'+L.ppm+'.0-vec2(.5),vec2(0.0),maximum)+vec2(.5);',
+ 'return texture2D(criptGIAtlas,coord/vec2('+L.width+'.0,'+L.height+'.0));',
+ '}'
+].join('\n');
 class BakedLighting{
  constructor(scene,world,project){
   this.scene=scene;this.world=world;this.project=project;
+  this.layout=C.UV.layout(project.editor?.quality||'medium');
   this.uniform={value:null};this.debugUniform={value:0};this.timeUniform={value:0};this.fogColor={value:new T.Color(0x2b504d)};this.fogDensity={value:.36};this.materials=[];this.moons=[];
   this.worker=null;this.generation=0;this.timer=0;
+  const init=new Uint8Array(this.layout.width*this.layout.height*4);
+  for(let i=0;i<init.length;i+=4){init[i]=30;init[i+1]=36;init[i+2]=43;init[i+3]=235}
   this.texture=this.makeTexture(init);this.uniform.value=this.texture;
   this.addMoonlight();
  }
  makeTexture(data){
-  const t=new T.DataTexture(data,R.nx,R.nz*R.ny,T.RGBAFormat,T.UnsignedByteType);
+  const t=new T.DataTexture(data,this.layout.width,this.layout.height,T.RGBAFormat,T.UnsignedByteType);
   t.wrapS=t.wrapT=T.ClampToEdgeWrapping;t.minFilter=t.magFilter=T.LinearFilter;
   t.generateMipmaps=false;t.flipY=false;t.needsUpdate=true;return t;
  }
@@ -44,7 +63,22 @@ class BakedLighting{
     '#ifdef USE_INSTANCING',
     '  criptFaceNormal=mat3(instanceMatrix)*criptFaceNormal;',
     '#endif',
-    'vCriptWorldNormal=normalize(mat3(modelMatrix)*criptFaceNormal);'
+    'vCriptWorldNormal=normalize(mat3(modelMatrix)*criptFaceNormal);',
+    // UV0 is measured in world meters, not local model units, so an instanced
+    // column and 8-m wall maintain the same albedo/normal texel footprint.
+    'vec3 criptAN=abs(vCriptWorldNormal);',
+    'vec2 criptUV=criptAN.y>=max(criptAN.x,criptAN.z)?vCriptBakedWorld.xz:',
+    ' (criptAN.x>criptAN.z?vCriptBakedWorld.zy:vCriptBakedWorld.xy);',
+    'criptUV/=1.8;',
+    '#ifdef USE_MAP',
+    '  vMapUv=criptUV;',
+    '#endif',
+    '#ifdef USE_NORMALMAP',
+    '  vNormalMapUv=criptUV;',
+    '#endif',
+    '#ifdef USE_ROUGHNESSMAP',
+    '  vRoughnessMapUv=criptUV;',
+    '#endif'
    ].join('\n'));
    shader.fragmentShader=[
     'varying vec3 vCriptBakedWorld;',
@@ -53,18 +87,11 @@ class BakedLighting{
     'uniform float criptDebugMode;',
     'uniform vec3 criptHeightFogColor;',
     'uniform float criptHeightFogDensity;',
-    'vec4 criptSampleBakedLight(vec3 p){',
-    '  float x=clamp(p.x/.9,.5,71.5),z=clamp(p.z/.9,.5,71.5);',
-    '  float level=clamp((p.y-.27)/1.32,0.0,7.0);',
-    '  float a=floor(level),b=min(7.0,a+1.0);',
-    '  vec4 l=texture2D(criptGIAtlas,vec2(x/72.0,(a*72.0+z)/576.0));',
-    '  vec4 h=texture2D(criptGIAtlas,vec2(x/72.0,(b*72.0+z)/576.0));',
-    '  return mix(l,h,fract(level));',
-    '}'
+    createSurfaceAtlasShader(this.layout)
    ].join('\n')+'\n'+shader.fragmentShader;
    shader.fragmentShader=shader.fragmentShader.replace('#include <lights_fragment_maps>',[
     '#include <lights_fragment_maps>',
-    'vec4 criptBake=criptSampleBakedLight(vCriptBakedWorld);',
+    'vec4 criptBake=criptSampleBakedLight(vCriptBakedWorld,normalize(vCriptWorldNormal));',
     'reflectedLight.indirectDiffuse*=mix(1.0,criptBake.a,.28);',
     'reflectedLight.indirectDiffuse+=criptBake.rgb*diffuseColor.rgb*1.60;'
    ].join('\n'));
@@ -91,7 +118,7 @@ class BakedLighting{
 
   };
   const oldKey=material.customProgramCacheKey?.bind(material);
-  material.customProgramCacheKey=()=>String(oldKey?oldKey():'')+'|cript-baked-gi-v4';
+  material.customProgramCacheKey=()=>String(oldKey?oldKey():'')+'|cript-baked-gi-v6-' + this.layout.ppm;
   material.needsUpdate=true;this.materials.push(material);
  }
  sources(){
@@ -148,7 +175,7 @@ class BakedLighting{
  }
  cacheKey(payload){
   const signature=JSON.stringify({rooms:payload.rooms,sources:payload.sources,
-    nx:payload.nx,nz:payload.nz,ny:payload.ny,ver:'baked-gi-ao-v4-contact-occlusion'});
+    nx:payload.nx,nz:payload.nz,ny:payload.ny,ver:'surface-charts-uv6',layout:payload.layout});
   let hash=2166136261;
   for(let i=0;i<signature.length;i++){
    hash^=signature.charCodeAt(i);hash=Math.imul(hash,16777619);
@@ -197,7 +224,7 @@ class BakedLighting{
    gx:r.gx,gz:r.gz,height:C.Masonry.config(r).height,
    solid:r.tiles.map(id=>!!this.project.assets.textures[id]?.solid)
   }));
-  const payload={...R,token,rooms,sources:this.sources()};
+  const payload={surfaceAtlas:true,layout:this.layout,token,rooms,sources:this.sources()};
   const key=this.cacheKey(payload);
   const finish=(msg,cached=false)=>{
    if(this.disposed||msg.token!==this.generation||msg.error||!msg.result)return;
@@ -209,14 +236,14 @@ class BakedLighting{
   };
   const fallback=()=>setTimeout(()=>{
    if(this.disposed||token!==this.generation||!window.CriptGIWorker)return;
-   finish({token,result:window.CriptGIWorker.bake(payload)});
+   finish({token,result:window.CriptGIWorker.bakeSurface(payload)});
   },0);
   const runWorker=()=>{
    if(token!==this.generation||this.disposed)return;
    if(typeof Worker!=='undefined'&&(typeof location==='undefined'||location.protocol!=='file:')){
     try{
      if(this.worker)this.worker.terminate();
-     const worker=new Worker('lighting-bake-worker.js?v=lighting05');
+     const worker=new Worker('lighting-bake-worker.js?v=uv06');
      this.worker=worker;
      worker.onmessage=e=>{finish(e.data);worker.terminate();if(this.worker===worker)this.worker=null};
      worker.onerror=()=>{worker.terminate();if(this.worker===worker)this.worker=null;fallback()};
@@ -227,9 +254,9 @@ class BakedLighting{
   };
   this.readCache(key).then(buffer=>{
    if(this.disposed||token!==this.generation)return;
-   if(buffer&&buffer.byteLength===R.nx*R.nz*R.ny*4)
+   if(buffer&&buffer.byteLength===this.layout.width*this.layout.height*4)
     finish({token,result:{buffer,statistics:{lights:payload.sources.length,
-      samples:R.nx*R.nz*R.ny,occlusions:0}}},true);
+      samples:0,occlusions:0,charts:96,texelsPerMeter:this.layout.ppm,padding:this.layout.padding}}},true);
    else runWorker();
   }).catch(runWorker);
  }
