@@ -114,6 +114,10 @@ renderInspector(){const a=this.asset(),body=$('inspectorBody');body.replaceChild
   this.heading(body,'BAKED GI / AMBIENT OCCLUSION','Atlas sampling is world-space, including instances. Bake runs off-thread and keeps torch/fire bounce and recessed corners consistent.');
   this.field(body,'LIGHTING QUALITY',C.project.editor,'quality','select',['low','medium','high']);
   this.button(body,'☀ REBAKE GLOBAL ILLUMINATION',()=>{C.game.lighting?.schedule();C.notice('BAKING STATIC LIGHT AND OCCLUSION')});
+  this.heading(body,'LIGHTMAP DEBUG VIEWS','Inspect the actual AO and baked illumination in the 3D Expedition view.');
+  this.button(body,'SHADED WORLD',()=>{C.game.lighting?.setDebugMode(0);C.notice('MATERIALS + AO + GI')});
+  this.button(body,'AO ONLY',()=>{C.game.lighting?.setDebugMode(1);C.notice('AO WHITE = CLEAR / DARK = OCCLUDED')});
+  this.button(body,'BAKED LIGHT ONLY',()=>{C.game.lighting?.setDebugMode(2);C.notice('INDIRECT + STATIC LIGHT ATLAS')});
   const metrics=C.game.lighting?.stats;
   if(metrics)this.heading(body,'LIGHTMAP',metrics.samples+' GI/AO probes · '+metrics.lights+' light emitters · '+metrics.occlusions+' blocked rays');
  }
