@@ -48,8 +48,8 @@ resetActors(){
     this.torches.push({g,light,flame,hearth:false,phase:Math.random()*10});
    }else if(o.kind==='fireplace'){
     // Real masonry hearth and low-poly coals, set against the chamber wall.
-    const stone=new T.MeshStandardMaterial({color:0x696b5e,roughness:.96});
-    const soot=new T.MeshStandardMaterial({color:0x252421,roughness:1});
+    const stone=this.architecture.mats.get('stone:cut');
+    const soot=this.architecture.mats.get('soot');
     const wood=new T.MeshStandardMaterial({color:0x4e3025,roughness:1});
     const glow=new T.MeshBasicMaterial({color:0xd36e39});
     const box=(w,h,d,x,y,z,mat)=>{const mesh=new T.Mesh(new T.BoxGeometry(w,h,d),mat);mesh.position.set(x,y,z);g.add(mesh);return mesh};
@@ -70,7 +70,7 @@ resetActors(){
     // Use the exact same hollow wheel-thrown lathe geometry as the Mesh Forge.
     const model=C.project.assets.meshes?.urn||C.MeshForge.presets.urn;
     const urn=new T.Mesh(C.MeshForge.toThree(T,C.MeshForge.build(model)),
-      new T.MeshStandardMaterial({color:0x867e6e,metalness:0,roughness:.9,flatShading:false}));
+      this.architecture.mats.get('goldstone:cut'));
     urn.scale.set(.73,.83,.73);urn.position.y=.04;g.add(urn);
    }
    else{const plane=new T.Mesh(new T.PlaneGeometry(1.17,1.17),new T.MeshBasicMaterial({map:this.sceneTexture(def),transparent:true,alphaTest:.15,side:T.DoubleSide}));plane.position.y=.59;g.add(plane)}
