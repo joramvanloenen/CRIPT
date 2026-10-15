@@ -32,17 +32,13 @@ function config(room){
   role:preset.role,archStyle:room.archStyle==='round'||room.archStyle==='pointed'?room.archStyle:(preset.vault==='ribbed'?'pointed':'round')};
 }
 function materialSurface(geo){
- // Author world-scale UVs per stone, even when courses use different shapes.
- const uv=geo.getAttribute('uv'),pos=geo.getAttribute('position'),nor=geo.getAttribute('normal');
- if(!uv||!pos||!nor)return geo;
- for(let i=0;i<uv.count;i++){
-  const x=pos.getX(i),y=pos.getY(i),z=pos.getZ(i);
-  const nx=nor.getX(i),ny=nor.getY(i),nz=nor.getZ(i);
-  const u=Math.abs(nx)>.5?z/S:x/S, v=Math.abs(ny)>.5?z/S:y/S;
-  uv.setXY(i,u,v);
- }
- uv.needsUpdate=true;return geo;
+ // Non-overlapping secondary UV charts for reusable mesh assets. Instancing
+ // uses the physical room atlas because a shared uv2 cannot encode a unique
+ // lightmap chart for each placement.
+ if(C.UV?.unwrapMesh)return C.UV.unwrapMesh(T,geo,{texelsPerMeter:6,padding:2});
+ return geo;
 }
+
 class Masonry{
  constructor(world,project,texture){
   this.world=world;this.project=project;this.texture=texture;this.geom=new Map();
@@ -113,7 +109,7 @@ class Masonry{
    const outline=[point(start+eps,radius),point(start+eps,outer),
                   point(end-eps,outer),point(end-eps,radius)];
    const result=C.MeshForge.extrude(outline,{depth,bevel:.011,erosion:.04,seed:index+17});
-   this.geom.set(key,C.MeshForge.toThree(T,result));
+   this.geom.set(key,materialSurface(C.MeshForge.toThree(T,result)));
    this.count.modeled++;this.count.models.add('gothic-voussoir');
   }
   return{key,geometry:this.geom.get(key)};
@@ -158,7 +154,8 @@ class Masonry{
    const shape=C.MeshForge.build({...recipe,seed:(recipe.seed||1)+seedOffset});
    const report=C.MeshForge.audit(shape);
    if(!report.valid)throw Error('Invalid modeled mesh '+id+': '+report.errors.join('; '));
-   this.geom.set(key,C.MeshForge.toThree(T,shape));
+   const geometry=C.MeshForge.toThree(T,shape);
+   this.geom.set(key,shape.triangles<300?materialSurface(geometry):geometry);
   }
   const bounds=this.geom.get(key).getAttribute('position');
   // Compute dimensions once per recipe. Source assets have actual dimensions.
@@ -199,7 +196,7 @@ class Masonry{
     [-w/2,d/2-e*(.65+n(6)*.5)],[-w/2,-d/2+e*(.75+n(7)*.5)]
    ];
    const shapeMesh=C.MeshForge.extrude(poly,{depth:.17,bevel:.025,erosion:.12,seed:shape*13+variant*7+1});
-   this.geom.set(key,C.MeshForge.toThree(T,shapeMesh));
+   this.geom.set(key,materialSurface(C.MeshForge.toThree(T,shapeMesh)));
   }
   return{key,geometry:this.geom.get(key)};
  }
