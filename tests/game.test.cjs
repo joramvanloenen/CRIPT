@@ -38,7 +38,7 @@ class Geometry extends Obj{
  getAttribute(k){return this.attributes[k]}
  translate(){return this}
 }
-class Material extends Obj{constructor(){super();this.isMeshStandardMaterial=true}clone(){return new Material()}}
+class Material extends Obj{constructor(options={}){super();Object.assign(this,options);this.isMeshStandardMaterial=true}clone(){return new Material({...this})}}
 class Color{set(){return this}setRGB(){return this}multiplyScalar(){return this}}
 class Fog extends Obj{constructor(){super();this.color=new Color();this.density=.06}}
 class Shape{moveTo(){}lineTo(){}closePath(){}}
