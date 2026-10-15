@@ -19,6 +19,7 @@ jobs:
           node --check mesh-vision.js
           node --check procedural-stone.js
           node --check architecture.js
+          node --check uv-mapping.js
           node --check lighting-bake-worker.js
           node --check lighting.js
           node --check game.js
@@ -36,6 +37,7 @@ jobs:
           node tests/world.test.cjs
           node tests/materials.test.cjs
           node tests/lighting.test.cjs
+          node tests/uv.test.cjs
           node tests/game.test.cjs
       - name: Save AI review meshes and views
         if: always()
