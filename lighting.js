@@ -216,7 +216,7 @@ class BakedLighting{
    if(typeof Worker!=='undefined'&&(typeof location==='undefined'||location.protocol!=='file:')){
     try{
      if(this.worker)this.worker.terminate();
-     const worker=new Worker('lighting-bake-worker.js');
+     const worker=new Worker('lighting-bake-worker.js?v=lighting05');
      this.worker=worker;
      worker.onmessage=e=>{finish(e.data);worker.terminate();if(this.worker===worker)this.worker=null};
      worker.onerror=()=>{worker.terminate();if(this.worker===worker)this.worker=null;fallback()};
