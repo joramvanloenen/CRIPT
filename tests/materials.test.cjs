@@ -50,4 +50,28 @@ const glossy=M.build(wet,{size:128});
 const wetRough=Array.from(glossy.roughness).filter((_,i)=>i%4===0);
 assert.ok(Math.min(...wetRough)<min,'Wet polished stone must develop lower roughness and sharper reflections');
 assert.ok(Math.max(...wetRough)>230,'Mortar remains rough even in a wet stone material');
+
+// Distinct physical-looking block variants must not be one repeated image.
+const variants=Array.from({length:5},(_,variant)=>M.build(stone,{size:128,variant}));
+const compare=(x,y)=>{let changed=0;for(let i=0;i<x.albedo.length;i+=4)
+ if(Math.abs(x.albedo[i]-y.albedo[i])>10)changed++;return changed/(x.size*x.size)};
+assert.ok(compare(variants[0],variants[1])>.30,'Different wall panels must have strongly different block patterns');
+assert.ok(compare(variants[1],variants[2])>.30,'Variants must alter stones throughout the wall');
+const blockAt=(x,y)=>M.stoneCell(x,y,2,4,17,false);
+assert.notEqual(blockAt(.16,.10).id,blockAt(.78,.10).id,'Tile sampler should give individual blocks unique IDs');
+assert.ok(blockAt(.04,.20).du>0,'Walls should have real interior faces');
+// Photo reference is optional and always blended INTO the procedural material,
+// keeping the separate mortar and height maps deterministic.
+const photoData=new Uint8Array(64*64*4);
+for(let y=0;y<64;y++)for(let x=0;x<64;x++){
+ const k=(y*64+x)*4,grain=((x*37+y*17)^((x*y)%23))%128;
+ photoData[k]=92+grain;photoData[k+1]=92+grain;photoData[k+2]=92+grain;photoData[k+3]=255;
+}
+const photoStone=M.build(stone,{size:128,photo:{width:64,data:photoData},variant:2});
+assert.equal(photoStone.photographic,true);
+assert.ok(compare(variants[2],photoStone)>.03,'Photographic image must affect resulting diffuse, not just be a URL label');
+assert.ok(photoStone.normals.some((v,i)=>i%4===0&&v!==variants[2].normals[i]),
+ 'Photographic height detail must influence generated normals');
+const muted=M.build({...stone,materialRecipe:{...M.recipeFor(stone),variation:0}},{size:128,variant:2});
+assert.ok(compare(muted,variants[2])>.08,'Block color variation needs to be editable');
 console.log('PASS: deterministic masonry normals, mortar depth, wet smoothness highlights, and rough joints');
