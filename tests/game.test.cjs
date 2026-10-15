@@ -68,11 +68,21 @@ assert.ok(C.game.lighting.sources().length>=30,'Static light sources must includ
 assert.equal(C.game.lighting.moons.length,4,'Exactly four rooms should have moonlit roof openings');
 const mat=C.game.architecture.mats.get('stone');
 assert.ok(mat.userData.criptBakedGI,'World materials must register baked shader hooks');
-const shader={uniforms:{},vertexShader:'void main(){\n#include <project_vertex>\n}',fragmentShader:'void main(){\n#include <lights_fragment_maps>\n#include <fog_fragment>\n}'};
+const shader={uniforms:{},vertexShader:'void main(){\n#include <project_vertex>\n}',fragmentShader:'void main(){\n#include <lights_fragment_maps>\n#include <opaque_fragment>\n#include <fog_fragment>\n}'};
 mat.onBeforeCompile(shader);
 assert.ok(shader.vertexShader.includes('instanceMatrix'),'Instanced geometry must compute baked sampling from world position');
 assert.ok(shader.fragmentShader.includes('criptSampleBakedLight'),'Indirect GI shader sample missing');
 assert.ok(shader.fragmentShader.includes('criptHeightFogDensity'),'Height fog shader missing');
+assert.ok(shader.fragmentShader.includes('criptContactAO'),'World-space contact ambient occlusion shader missing');
+assert.ok(shader.fragmentShader.includes('gl_FragColor.rgb*=mix(1.0,criptSurfaceAO'),'AO must affect visible stone radiance');
+assert.equal(shader.uniforms.criptDebugMode,C.game.lighting.debugUniform,'Diagnostic uniforms must be connected to PBR shader');
+assert.ok(C.game.architecture.mats.get('trim').map,'Architectural trims must have stone textures');
+assert.ok(C.game.architecture.mats.get('ivory').normalMap,'Carved capitals must carry stone normals');
+assert.ok(C.game.architecture.mats.get('soot').roughnessMap,'Weathered decorative blocks need roughness');
+C.game.lighting.setDebugMode(1);
+assert.equal(C.game.lighting.debugUniform.value,1);
+C.game.lighting.setDebugMode(0);
+
 assert.ok(!shader.fragmentShader.includes('\\\\n'),'Shader source must contain real GLSL newline characters');
 assert.ok(shader.uniforms.criptGIAtlas===C.game.lighting.uniform,'Shared GI atlas must be shader-bound');
 
