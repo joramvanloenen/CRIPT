@@ -113,6 +113,11 @@ renderInspector(){const a=this.asset(),body=$('inspectorBody');body.replaceChild
  if(this.mode==='atmosphere'){this.heading(body,'FOG & LIGHT','A room references an atmosphere preset. Static torch, fireplace and moonlight illumination is baked into one compact light atlas.');this.field(body,'FOG COLOR',a,'fog','color');for(const k of ['density','heightFog','ambient','torch'])this.field(body,k.toUpperCase(),a,k,'number');this.button(body,'APPLY TO SELECTED ROOM',()=>{this.checkpoint();C.project.rooms[this.selected.room||'room-0'].theme=a.id;this.change()});
   this.heading(body,'BAKED GI / AMBIENT OCCLUSION','Atlas sampling is world-space, including instances. Bake runs off-thread and keeps torch/fire bounce and recessed corners consistent.');
   this.field(body,'LIGHTING QUALITY',C.project.editor,'quality','select',['low','medium','high']);
+  const uv=C.game.lighting?.layout;
+  if(uv)this.heading(body,'SURFACE LIGHTMAP UVS',
+    uv.ppm+' lightmap texels/m · '+uv.width+' × '+uv.height+
+    ' atlas · six directional charts/room · '+uv.padding+'-texel chart gutters. '+
+    'Diffuse is mapped at a constant physical 1.8 m/repeat on all scaled meshes.');
   this.button(body,'☀ REBAKE GLOBAL ILLUMINATION',()=>{C.game.lighting?.schedule();C.notice('BAKING STATIC LIGHT AND OCCLUSION')});
   this.heading(body,'LIGHTMAP DEBUG VIEWS','Inspect the actual AO and baked illumination in the 3D Expedition view.');
   this.button(body,'SHADED WORLD',()=>{C.game.lighting?.setDebugMode(0);C.notice('MATERIALS + AO + GI')});
