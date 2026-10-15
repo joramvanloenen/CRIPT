@@ -11,7 +11,7 @@ for(let i=0;i<init.length;i+=4){init[i]=30;init[i+1]=36;init[i+2]=43;init[i+3]=2
 class BakedLighting{
  constructor(scene,world,project){
   this.scene=scene;this.world=world;this.project=project;
-  this.uniform={value:null};this.timeUniform={value:0};this.fogColor={value:new T.Color(0x2b504d)};this.fogDensity={value:.36};this.materials=[];this.moons=[];
+  this.uniform={value:null};this.debugUniform={value:0};this.timeUniform={value:0};this.fogColor={value:new T.Color(0x2b504d)};this.fogDensity={value:.36};this.materials=[];this.moons=[];
   this.worker=null;this.generation=0;this.timer=0;
   this.texture=this.makeTexture(init);this.uniform.value=this.texture;
   this.addMoonlight();
@@ -25,24 +25,32 @@ class BakedLighting{
   if(!material?.isMeshStandardMaterial)return;
   if(material.userData?.criptBakedGI)return;
   material.userData=material.userData||{};material.userData.criptBakedGI=true;
-  const prev=material.onBeforeCompile,gi=this.uniform,fogColor=this.fogColor,fogDensity=this.fogDensity;
+  const prev=material.onBeforeCompile,gi=this.uniform,debug=this.debugUniform,fogColor=this.fogColor,fogDensity=this.fogDensity;
   material.onBeforeCompile=shader=>{
    if(prev)prev(shader);
    shader.uniforms.criptGIAtlas=gi;
+   shader.uniforms.criptDebugMode=debug;
    shader.uniforms.criptHeightFogColor=fogColor;
    shader.uniforms.criptHeightFogDensity=fogDensity;
-   shader.vertexShader='varying vec3 vCriptBakedWorld;\n'+shader.vertexShader;
+   shader.vertexShader='varying vec3 vCriptBakedWorld;\nvarying vec3 vCriptWorldNormal;\n'+shader.vertexShader;
    shader.vertexShader=shader.vertexShader.replace('#include <project_vertex>',[
     '#include <project_vertex>',
     'vec4 criptProbePoint=vec4(transformed,1.0);',
     '#ifdef USE_INSTANCING',
     '  criptProbePoint=instanceMatrix*criptProbePoint;',
     '#endif',
-    'vCriptBakedWorld=(modelMatrix*criptProbePoint).xyz;'
+    'vCriptBakedWorld=(modelMatrix*criptProbePoint).xyz;',
+    'vec3 criptFaceNormal=normal;',
+    '#ifdef USE_INSTANCING',
+    '  criptFaceNormal=mat3(instanceMatrix)*criptFaceNormal;',
+    '#endif',
+    'vCriptWorldNormal=normalize(mat3(modelMatrix)*criptFaceNormal);'
    ].join('\n'));
    shader.fragmentShader=[
     'varying vec3 vCriptBakedWorld;',
+    'varying vec3 vCriptWorldNormal;',
     'uniform sampler2D criptGIAtlas;',
+    'uniform float criptDebugMode;',
     'uniform vec3 criptHeightFogColor;',
     'uniform float criptHeightFogDensity;',
     'vec4 criptSampleBakedLight(vec3 p){',
@@ -57,8 +65,18 @@ class BakedLighting{
    shader.fragmentShader=shader.fragmentShader.replace('#include <lights_fragment_maps>',[
     '#include <lights_fragment_maps>',
     'vec4 criptBake=criptSampleBakedLight(vCriptBakedWorld);',
-    'reflectedLight.indirectDiffuse*=mix(1.0,criptBake.a,.84);',
+    'reflectedLight.indirectDiffuse*=mix(1.0,criptBake.a,.28);',
     'reflectedLight.indirectDiffuse+=criptBake.rgb*diffuseColor.rgb*1.60;'
+   ].join('\n'));
+   shader.fragmentShader=shader.fragmentShader.replace('#include <opaque_fragment>',[
+    '#include <opaque_fragment>',
+    'float criptFloorTerm=exp(-max(0.0,vCriptBakedWorld.y)*2.75);',
+    'float criptWallFacing=1.0-clamp(abs(normalize(vCriptWorldNormal).y),0.0,1.0);',
+    'float criptContactAO=1.0-.51*criptFloorTerm*criptWallFacing;',
+    'float criptSurfaceAO=clamp(criptBake.a*criptContactAO,.16,1.0);',
+    'gl_FragColor.rgb*=mix(1.0,criptSurfaceAO,.76);',
+    'if(criptDebugMode>1.5)gl_FragColor.rgb=criptBake.rgb;',
+    'else if(criptDebugMode>.5)gl_FragColor.rgb=vec3(criptSurfaceAO);'
    ].join('\n'));
    // Height fog is part of the world material, not a full-screen blur pass.
    // It pools against low masonry, revealing silhouettes above the mist.
@@ -67,13 +85,13 @@ class BakedLighting{
     'float criptFogHeight=exp(-max(0.0,vCriptBakedWorld.y-.18)*1.45);',
     'float criptFogDistance=1.0-exp(-distance(vCriptBakedWorld,cameraPosition)*.082);',
     'float criptFog=clamp(criptFogHeight*criptFogDistance*criptHeightFogDensity,0.0,.68);',
-    'gl_FragColor.rgb=mix(gl_FragColor.rgb,criptHeightFogColor,criptFog);'
+    'if(criptDebugMode<.5)gl_FragColor.rgb=mix(gl_FragColor.rgb,criptHeightFogColor,criptFog);'
    ].join(String.fromCharCode(10)));
 
 
   };
   const oldKey=material.customProgramCacheKey?.bind(material);
-  material.customProgramCacheKey=()=>String(oldKey?oldKey():'')+'|cript-baked-gi-v2';
+  material.customProgramCacheKey=()=>String(oldKey?oldKey():'')+'|cript-baked-gi-v4';
   material.needsUpdate=true;this.materials.push(material);
  }
  sources(){
@@ -130,7 +148,7 @@ class BakedLighting{
  }
  cacheKey(payload){
   const signature=JSON.stringify({rooms:payload.rooms,sources:payload.sources,
-    nx:payload.nx,nz:payload.nz,ny:payload.ny,ver:'baked-gi-ao-v3'});
+    nx:payload.nx,nz:payload.nz,ny:payload.ny,ver:'baked-gi-ao-v4-contact-occlusion'});
   let hash=2166136261;
   for(let i=0;i<signature.length;i++){
    hash^=signature.charCodeAt(i);hash=Math.imul(hash,16777619);
@@ -215,6 +233,7 @@ class BakedLighting{
    else runWorker();
   }).catch(runWorker);
  }
+ setDebugMode(mode=0){this.debugUniform.value=Math.max(0,Math.min(2,Math.round(mode)))}
  setFog(atmosphere){
   if(!atmosphere)return;
   this.fogColor.value.set(atmosphere.fog||'#284744');
