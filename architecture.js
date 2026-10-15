@@ -82,8 +82,19 @@ class Masonry{
    }
    this.count.photoMicrodetail=true;
   }).catch(()=>{});
-  for(const [id,color]of Object.entries({mortar:0x192525,shadow:0x101d1c,trim:0x889187,ivory:0xbeb99f,soot:0x343c38,iron:0x514b42,wood:0x564b38,lichen:0x4b7561,gold:0xb59a70,glass:0x98d6b9,light:0xcddcc0,water:0x2c645d})){
-   this.mats.set(id,new T.MeshStandardMaterial({color,side:T.DoubleSide,roughness:id==='iron'?.61:id==='glass'?.28:.95,metalness:id==='iron'?.28:0}));
+  // All architectural masonry, including trims, capitals, shelves and
+  // soot-darkened carvings, must have the same albedo/normal/roughness detail.
+  // Metal, timber, glass and recess darkness deliberately remain other materials.
+  const stoneSkin={mortar:'stone',trim:'stone:cut',ivory:'goldstone:cut',
+    soot:'stone:cut',lichen:'moss:cut',gold:'goldstone:cut'};
+  for(const [id,color]of Object.entries({mortar:0xb0a99a,shadow:0x101d1c,trim:0xb7b8a9,ivory:0xd4c9b0,soot:0x77736e,iron:0x514b42,wood:0x564b38,lichen:0x8ca08b,gold:0xd5bd8d,glass:0x98d6b9,light:0xcddcc0,water:0x2c645d})){
+   const src=this.mats.get(stoneSkin[id]);
+   this.mats.set(id,new T.MeshStandardMaterial({
+    ...(src?{map:src.map,normalMap:src.normalMap,roughnessMap:src.roughnessMap,
+       normalScale:src.normalScale}:{}),
+    color,side:T.DoubleSide,roughness:src?1:id==='iron'?.61:id==='glass'?.28:.95,
+    metalness:id==='iron'?.28:0
+   }));
   }
  }
  geometry(w,h,d){
