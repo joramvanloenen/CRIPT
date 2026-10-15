@@ -48,20 +48,40 @@ class Masonry{
   this.world=world;this.project=project;this.texture=texture;this.geom=new Map();
   this.mats=new Map();this.rooms=new Map();this.colliders=[];this.count={blocks:0,arches:0,vaults:0,rubble:0,wallBaseDebris:0,rooms:0,modeled:0,models:new Set()};
   this.unit=new T.Object3D();
-  this.surfaceTextures=[];
+  this.surfaceTextures=[];this.surfaceSets=[];this.variationCounts=new Map();
   for(const [id,asset]of Object.entries(project.assets.textures)){
    const quality=project.editor?.quality||'medium';
    if(!C.StoneMaterials)throw Error('Procedural stone generator not loaded');
    for(const cut of [false,true]){
-    const surface=C.StoneMaterials.textures(T,asset,{quality,cut});
-    this.surfaceTextures.push(surface.diffuse,surface.normal,surface.roughness);
-    this.mats.set(cut?id+':cut':id,new T.MeshStandardMaterial({
-     map:surface.diffuse,normalMap:surface.normal,roughnessMap:surface.roughness,
-     normalScale:new T.Vector2(cut?.48:.95,cut?.48:.95),
-     roughness:1,metalness:0,color:0xffffff,side:T.FrontSide
-    }));
+    const count=cut?3:5;
+    const prefix=cut?id+':cut':id;
+    this.variationCounts.set(prefix,count);
+    for(let variant=0;variant<count;variant++){
+     const surface=C.StoneMaterials.textures(T,asset,{quality,cut,variant});
+     this.surfaceTextures.push(surface.diffuse,surface.normal,surface.roughness);
+     const key=variant?prefix+':v'+variant:prefix;
+     this.mats.set(key,new T.MeshStandardMaterial({
+      map:surface.diffuse,normalMap:surface.normal,roughnessMap:surface.roughness,
+      normalScale:new T.Vector2(cut?.64:1.16,cut?.64:1.16),
+      roughness:1,metalness:0,color:0xffffff,side:T.FrontSide
+     }));
+     this.surfaceSets.push({asset,surface,cut,variant});
+    }
    }
   }
+  // Poly Haven CC0 photographic microdetail is optional; the full PBR
+  // material is available instantly even when remote imagery is blocked.
+  C.StoneMaterials.loadPhotographicReference().then(photo=>{
+   if(!photo||this.disposed)return;
+   for(const {asset,surface,cut,variant}of this.surfaceSets){
+    const data=C.StoneMaterials.build(asset,{size:surface.size,cut,variant,photo});
+    for(const [map,buffer]of [[surface.diffuse,data.albedo],
+      [surface.normal,data.normals],[surface.roughness,data.roughness]]){
+     map.image.data.set(buffer);map.needsUpdate=true;
+    }
+   }
+   this.count.photoMicrodetail=true;
+  }).catch(()=>{});
   for(const [id,color]of Object.entries({mortar:0x192525,shadow:0x101d1c,trim:0x889187,ivory:0xbeb99f,soot:0x343c38,iron:0x514b42,wood:0x564b38,lichen:0x4b7561,gold:0xb59a70,glass:0x98d6b9,light:0xcddcc0,water:0x2c645d})){
    this.mats.set(id,new T.MeshStandardMaterial({color,side:T.DoubleSide,roughness:id==='iron'?.61:id==='glass'?.28:.95,metalness:id==='iron'?.28:0}));
   }
@@ -102,6 +122,13 @@ class Masonry{
   return this.rooms.get(room.id);
  }
  instance(room,matId,geoKey,geometry,x,y,z,rx=0,ry=0,rz=0,color=null,scale=null){
+  const count=this.variationCounts.get(matId)||1;
+  if(count>1){
+   const pick=hash(Math.round(x*13.37)+room.gx*7,
+     Math.round(z*17.31)+room.gz*19,Math.round(y*4.87)+geoKey.length*23);
+   const variant=Math.min(count-1,Math.floor(pick*count));
+   if(variant)matId+=':v'+variant;
+  }
   const store=this.roomStore(room),key=matId+'|'+geoKey;
   if(!store.buckets.has(key))store.buckets.set(key,{geometry,material:this.mats.get(matId)||this.mats.get('trim'),instances:[]});
   store.buckets.get(key).instances.push({x,y,z,rx,ry,rz,color,scale});
@@ -601,6 +628,7 @@ class Masonry{
   return this.count;
  }
  dispose(){
+  this.disposed=true;
   for(const geometry of this.geom.values())geometry.dispose?.();
   for(const mat of this.mats.values())mat.dispose?.();
   for(const tex of this.surfaceTextures)tex.dispose?.();this.surfaceTextures.length=0;
