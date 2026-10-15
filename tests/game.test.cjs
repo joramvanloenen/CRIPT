@@ -55,7 +55,7 @@ const T={Scene:Obj,Group:Obj,PerspectiveCamera:Obj,WebGLRenderer:Renderer,Hemisp
  Shape,FogExp2:Fog,Color,SRGBColorSpace:1,NearestFilter:2,NearestMipmapNearestFilter:2,RepeatWrapping:3,DoubleSide:4,FrontSide:0,RGBAFormat:1023,UnsignedByteType:5121};
 const window={THREE:T,addEventListener(){}},localStorage={getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v)},performance={now:()=>0};
 const sandbox={window,document,localStorage,performance,Math,setTimeout,clearTimeout,requestAnimationFrame(){},console,confirm:()=>true,alert(){}};
-for(const file of ['mesh-forge.js','mesh-vision.js','mesh-art-pass.js','data.js','weapons.js','procedural-stone.js','architecture.js','lighting-bake-worker.js','lighting.js','game.js']){
+for(const file of ['mesh-forge.js','uv-mapping.js','mesh-vision.js','mesh-art-pass.js','data.js','weapons.js','procedural-stone.js','architecture.js','lighting-bake-worker.js','lighting.js','game.js']){
  vm.runInNewContext(fs.readFileSync(file,'utf8'),sandbox,{filename:file});
 }
 const C=window.Cript,game=C.game;
@@ -190,7 +190,7 @@ assert.equal(game.room.id,'room-5');
 assert.ok(game.seen.has('room-5'),'Visiting the hidden room should reveal it');
 
 const html=fs.readFileSync('index.html','utf8'),css=fs.readFileSync('style.css','utf8');
-assert.ok(html.indexOf('src="weapons.js?v=lighting05"')<html.indexOf('src="game.js?v=lighting05"'),'Weapon rig must load before engine');
+assert.ok(html.indexOf('src="weapons.js?v=uv06"')<html.indexOf('src="game.js?v=uv06"'),'Weapon rig must load before engine');
 for(const key of ['q','e','w','a','s','d','f','attack','dodge','spell']){
  const m=html.match(new RegExp('<button[^>]*data-touch="'+key+'"[^>]*>([\\s\\S]*?)<\\/button>'));
  assert.ok(m&&m[1].includes('<svg'),'Touch button '+key+' must use a vector icon');
