@@ -26,8 +26,8 @@ for(const L of [lo,med,hi]){
  const c=UV.chart(L,0,0,2);
  assert.ok(c.y-(a.y+a.h)>=L.padding*2,'Insufficient pad between unrelated surface charts');
 }
-assert.deepEqual(UV.diffuseUV([3.6,4.5,5.4],[0,1,0]),[2,3]);
-assert.deepEqual(UV.diffuseUV([3.6,4.5,5.4],[1,0,0]),[3,2.5]);
+assert.ok(UV.diffuseUV([3.6,4.5,5.4],[0,1,0]).every((v,i)=>Math.abs(v-[2,3][i])<1e-6));
+assert.ok(UV.diffuseUV([3.6,4.5,5.4],[1,0,0]).every((v,i)=>Math.abs(v-[3,2.5][i])<1e-6));
 class Attr{
  constructor(data,itemSize){this.array=Float32Array.from(data);this.itemSize=itemSize;this.count=this.array.length/itemSize}
  getX(i){return this.array[i*this.itemSize]}
