@@ -39,18 +39,25 @@ function bake(input){
   const y=y0+yIndex*dy;
   for(let zi=0;zi<nz;zi++)for(let xi=0;xi<nx;xi++){
    const x=(xi+.5)*step,z=(zi+.5)*step,at=index(xi,zi,yIndex);
-   const nearFloor= y<2.6?1:0;
-   let walls=0;
-   // Clearance-based ambient occlusion: corners, floor/wall junctions and
-   // the underside of roof slabs naturally gather shadow.
-   for(const [dx,dz] of [[.42,0],[-.42,0],[0,.42],[0,-.42],[.78,.78],[-.78,.78],[.78,-.78],[-.78,-.78]]){
-    if(solid(x+dx,z+dz))walls+=dx*dz? .045:.095;
+   // Hemispherical contact AO: 8 directions * 3 distances. Unlike the old
+   // four near-cell checks, this resolves broad wall-floor contact, corners,
+   // recesses and deep arch bases. The bake stays deterministic and cheap.
+   const walls=[[1,0],[-1,0],[0,1],[0,-1],
+      [.707,.707],[-.707,.707],[.707,-.707],[-.707,-.707]];
+   let obstruction=0,nearby=0;
+   const radii=[.38,.78,1.35],weights=[.13,.085,.045];
+   for(const [dx,dz] of walls)for(let k=0;k<radii.length;k++){
+    const radius=radii[k];
+    if(solid(x+dx*radius,z+dz*radius)){
+     obstruction+=weights[k];nearby+=k===0?1:0;
+    }
    }
    const cellX=clamp(Math.floor(x/1.8),0,35),cellZ=clamp(Math.floor(z/1.8),0,35);
    const ceil=ceilings[cellZ*36+cellX]||4;
-   const ceilingOcclusion= Math.abs(y-ceil)<.52?.16:0;
-   let occlusion=clamp(1-walls*(.60+nearFloor*.4)-ceilingOcclusion, .23,1);
-   if(solid(x,z))occlusion=clamp(occlusion*.56,.16,.7);
+   const floorContact=Math.exp(-Math.max(0,y)*2.25)*(.08+.19*Math.min(1,nearby/3));
+   const ceilingContact=Math.exp(-Math.abs(y-ceil)*1.75)*(.08+.15*Math.min(1,obstruction));
+   let occlusion=clamp(1-obstruction*.79-floorContact-ceilingContact,.20,1);
+   if(solid(x,z))occlusion=clamp(occlusion*.80,.18,.84);
    ao[at]=occlusion;
    // Ambient environmental irradiance is deliberately low: torches define space.
    let lr=.11,lg=.145,lb=.18;
@@ -80,15 +87,19 @@ function bake(input){
   for(const [ox,oz]of [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,1],[-1,1],[1,-1]]){
    const px=x+ox,pz=z+oz;if(px<0||pz<0||px>=nx||pz>=nz)continue;
    const nxw=(px+.5)*step,nzw=(pz+.5)*step;
-   if(solid((cx+nxw)*.5,(cz+nzw)*.5))continue;
+   // Block bounce across actual masonry instead of smearing light through
+   // the wall behind the two adjacent probe cells.
+   if(solid((cx+nxw)*.5,(cz+nzw)*.5)||
+      solid(cx*.67+nxw*.33,cz*.67+nzw*.33)||
+      solid(cx*.33+nxw*.67,cz*.33+nzw*.67))continue;
    const j=index(px,pz,layer)*3;const weight=Math.abs(ox)+Math.abs(oz)===2?.5:1;
    rr+=raw[j]*weight;gg+=raw[j+1]*weight;bb+=raw[j+2]*weight;w+=weight;
   }
   if(w){bounce[i]=rr/w;bounce[i+1]=gg/w;bounce[i+2]=bb/w;}
   // Scale direct irradiance to allow diffuse materials to react visibly.
-  const lightR=clamp((raw[i]*.85+bounce[i]*.38)*ao[idx],0,2),
-   lightG=clamp((raw[i+1]*.85+bounce[i+1]*.38)*ao[idx],0,2),
-   lightB=clamp((raw[i+2]*.85+bounce[i+2]*.38)*ao[idx],0,2);
+  const lightR=clamp((raw[i]*.80+bounce[i]*.47)*ao[idx],0,2),
+   lightG=clamp((raw[i+1]*.80+bounce[i+1]*.47)*ao[idx],0,2),
+   lightB=clamp((raw[i+2]*.80+bounce[i+2]*.47)*ao[idx],0,2);
   const j=idx*4;
   out[j]=Math.round(clamp(lightR*180,0,255));out[j+1]=Math.round(clamp(lightG*180,0,255));out[j+2]=Math.round(clamp(lightB*180,0,255));out[j+3]=Math.round(ao[idx]*255);
  }
