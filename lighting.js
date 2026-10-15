@@ -279,5 +279,5 @@ class BakedLighting{
   this.moons.length=0;this.texture?.dispose();
  }
 }
-C.Lighting={BakedLighting,resolution:R};
+C.Lighting={BakedLighting,resolution:C.UV.layout};
 })();
