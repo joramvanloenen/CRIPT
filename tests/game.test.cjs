@@ -61,7 +61,9 @@ for(const file of ['mesh-forge.js','uv-mapping.js','mesh-vision.js','mesh-art-pa
 const C=window.Cript,game=C.game;
 assert.ok(game,'3D game did not boot');
 assert.ok(game.weaponView.children.length,'No first-person weapon geometry');
-assert.ok(verticalUVRepeats>0,'UVs on masonry must use world-scale repeat');
+assert.ok(C.UV&&C.game.architecture.geom.size>0,'World-space texel mapper must be loaded');
+assert.ok([...C.game.architecture.geom.values()].some(geo=>geo.getAttribute?.('uv2')),
+ 'Masonry models must have secondary non-overlapping UV2 island coordinates');
 assert.equal(C.masonryStats.rooms,16);
 assert.ok(C.game.lighting,'Runtime must allocate a baked GI atlas');
 assert.ok(C.game.lighting.sources().length>=30,'Static light sources must include extra torches and hearths');
@@ -71,6 +73,14 @@ assert.ok(mat.userData.criptBakedGI,'World materials must register baked shader 
 const shader={uniforms:{},vertexShader:'void main(){\n#include <project_vertex>\n}',fragmentShader:'void main(){\n#include <lights_fragment_maps>\n#include <opaque_fragment>\n#include <fog_fragment>\n}'};
 mat.onBeforeCompile(shader);
 assert.ok(shader.vertexShader.includes('instanceMatrix'),'Instanced geometry must compute baked sampling from world position');
+assert.ok(shader.vertexShader.includes('vMapUv=criptUV'),'Diffuse maps must use physical world-space UV0');
+assert.ok(shader.vertexShader.includes('vNormalMapUv=criptUV'),'Normal maps must use the same physical texel density');
+assert.ok(shader.vertexShader.includes('vRoughnessMapUv=criptUV'),'Roughness must share correct UV0 scale');
+assert.ok(shader.fragmentShader.includes('chartOrigin'),'Lightmap must address directional charts with padding');
+assert.equal(C.game.lighting.layout.ppm,C.UV.layout(C.project.editor?.quality).ppm);
+assert.equal(C.game.lighting.layout.padding,2);
+assert.equal(C.game.lighting.texture.image?.width||C.game.lighting.layout.width,C.game.lighting.layout.width);
+
 assert.ok(shader.fragmentShader.includes('criptSampleBakedLight'),'Indirect GI shader sample missing');
 assert.ok(shader.fragmentShader.includes('criptHeightFogDensity'),'Height fog shader missing');
 assert.ok(shader.fragmentShader.includes('criptContactAO'),'World-space contact ambient occlusion shader missing');
