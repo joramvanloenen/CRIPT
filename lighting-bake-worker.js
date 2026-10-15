@@ -105,12 +105,140 @@ function bake(input){
  }
  return{width:nx,height:nz*ny,nx,nz,ny,step,dy,y0,buffer:out.buffer,statistics:{lights:lights.length,samples:sz,occlusions:shadowTests}};
 }
-scope.CriptGIWorker={bake};
+// Surface-chart bake: six directions per room, a physical texel density and
+// two-pixel guard bands. No trilinear mixing between unrelated height slices.
+function bakeSurface(input){
+ const U=scope.CriptUV;
+ if(!U)throw Error('CRIPT UV charts not loaded');
+ const L=input.layout||U.layout(input.quality||'medium');
+ const {rooms,sources=[]}=input;
+ const out=new Uint8Array(L.width*L.height*4);
+ const tiles=new Uint8Array(36*36),roof=new Float32Array(36*36);
+ for(const r of rooms)for(let z=0;z<9;z++)for(let x=0;x<9;x++){
+  const i=(r.gz*9+z)*36+r.gx*9+x;
+  tiles[i]=r.solid[z*9+x]?1:0;roof[i]=r.height;
+ }
+ const occupied=(x,z,y)=>{
+  const gx=Math.floor(x/1.8),gz=Math.floor(z/1.8);
+  if(gx<0||gz<0||gx>=36||gz>=36)return true;
+  const k=gz*36+gx;
+  return tiles[k]&&y<roof[k]-.075;
+ };
+ const blocked=(p,l)=>{
+  const dx=l.x-p[0],dy=l.y-p[1],dz=l.z-p[2],distance=Math.hypot(dx,dy,dz);
+  const steps=Math.min(28,Math.max(2,Math.ceil(distance/.56)));
+  for(let i=1;i<steps;i++){
+   const t=i/steps;
+   if(occupied(p[0]+dx*t,p[2]+dz*t,p[1]+dy*t))return true;
+  }return false;
+ };
+ function samplePosition(r,side,tx,ty){
+  const x0=r.gx*L.roomMeters,z0=r.gz*L.roomMeters;
+  const u=Math.min(L.roomMeters,(tx+.5)/L.ppm),v=Math.min(L.maxHeight,(ty+.5)/L.ppm);
+  if(side===0)return[[x0+u,.055,z0+v],[0,1,0]];
+  if(side===1)return[[x0+u,r.height-.12,z0+v],[0,-1,0]];
+  if(side===2||side===3){
+   const zi=Math.max(0,Math.min(8,Math.floor(u/1.8))),row=4;
+   let x=(side===2?0:9)*1.8;
+   for(let j=0;j<5;j++){
+    const xi=side===2?4-j:4+j;
+    if(xi<0||xi>8)break;
+    if(r.solid[zi*9+xi]){
+     x=(side===2?(xi+1)*1.8:xi*1.8);
+     break;
+    }
+   }
+   return[[x0+x+(side===2?.10:-.10),Math.min(v,r.height-.08),z0+u],side===2?[1,0,0]:[-1,0,0]];
+  }
+  const xi=Math.max(0,Math.min(8,Math.floor(u/1.8)));
+  let z=(side===4?0:9)*1.8;
+  for(let j=0;j<5;j++){
+   const zi=side===4?4-j:4+j;
+   if(zi<0||zi>8)break;
+   if(r.solid[zi*9+xi]){
+    z=(side===4?(zi+1)*1.8:zi*1.8);break;
+   }
+  }
+  return[[x0+u,Math.min(v,r.height-.08),z0+z+(side===4?.10:-.10)],side===4?[0,0,1]:[0,0,-1]];
+ }
+ const dirs=[[1,0],[-1,0],[0,1],[0,-1],[.707,.707],[-.707,.707],[.707,-.707],[-.707,-.707]];
+ const contacts=[.32,.70,1.35],influence=[.14,.09,.045];
+ let rays=0,count=0,minAO=1;
+ for(const room of rooms){
+  const lights=sources.filter(l=>Math.hypot(l.x-(room.gx+.5)*L.roomMeters,l.z-(room.gz+.5)*L.roomMeters)<l.radius+11);
+  for(let side=0;side<6;side++){
+   const chart=U.chart(L,room.gx,room.gz,side),{w,h}=chart;
+   const diffuse=new Float32Array(w*h*3),occlusion=new Float32Array(w*h);
+   for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=y*w+x,[p,n]=samplePosition(room,side,x,y);
+    let obstacle=0;
+    for(const [dx,dz]of dirs)for(let k=0;k<3;k++){
+     if(occupied(p[0]+dx*contacts[k],p[2]+dz*contacts[k],p[1]))
+      obstacle+=influence[k];
+    }
+    const wallSide=side>=2,nearGround=Math.exp(-Math.max(0,p[1])*(wallSide?1.5:2.1));
+    const nearRoof=Math.exp(-Math.abs(room.height-p[1])*1.7);
+    const ao=clamp(1-obstacle*.66-(wallSide?.25:.11)*nearGround-
+      (side===1?.13:.10)*nearRoof,.20,1);
+    occlusion[i]=ao;minAO=Math.min(minAO,ao);
+    let red=.095,green=.12,blue=.14;
+    for(const light of lights){
+     const dx=light.x-p[0],dy=light.y-p[1],dz=light.z-p[2];
+     const d2=dx*dx+dy*dy+dz*dz;
+     if(d2>light.radius*light.radius)continue;
+     const distance=Math.sqrt(d2),f=1-distance/light.radius;
+     if(f<=0||blocked(p,light)){rays++;continue}
+     let power=f*f*light.power*(.55+.45*Math.max(0,(n[0]*dx+n[1]*dy+n[2]*dz)/Math.max(.001,distance)));
+     if(light.type==='moon'){
+      const spread=Math.max(.9,(light.y-p[1])*.21),rad=Math.hypot(dx,dz);
+      power*=1-clamp((rad-spread)/(spread*.55),0,1);
+     }
+     red+=power*light.color[0];green+=power*light.color[1];blue+=power*light.color[2];
+    }
+    diffuse[i*3]=red;diffuse[i*3+1]=green;diffuse[i*3+2]=blue;
+   }
+   // Neighbour gather stays entirely inside a *single surface chart*.
+   for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=y*w+x,j=i*3;
+    let r=0,g=0,b=0,weight=0;
+    for(const [ox,oy]of [[-1,0],[1,0],[0,-1],[0,1]]){
+     const xx=x+ox,yy=y+oy;
+     if(xx<0||xx>=w||yy<0||yy>=h)continue;
+     const k=(yy*w+xx)*3;
+     r+=diffuse[k];g+=diffuse[k+1];b+=diffuse[k+2];weight++;
+    }
+    const lum=[diffuse[j],diffuse[j+1],diffuse[j+2]];
+    const bounce=weight?[r/weight,g/weight,b/weight]:lum;
+    const at=((chart.y+y)*L.width+chart.x+x)*4;
+    for(let ch=0;ch<3;ch++)
+     out[at+ch]=Math.round(clamp((lum[ch]*.75+bounce[ch]*.35)*occlusion[i]*180,0,255));
+    out[at+3]=Math.round(occlusion[i]*255);count++;
+   }
+   // Duplicate the last real texel into two rows/columns of gutter to
+   // prevent bilinear leakage from unrelated charts and black empty atlas.
+   for(let y=-chart.pad;y<h+chart.pad;y++){
+    const yy=clamp(y,0,h-1);
+    for(let x=-chart.pad;x<w+chart.pad;x++){
+     if(x>=0&&x<w&&y>=0&&y<h)continue;
+     const xx=clamp(x,0,w-1);
+     const dst=((chart.y+y)*L.width+chart.x+x)*4,src=((chart.y+yy)*L.width+chart.x+xx)*4;
+     out[dst]=out[src];out[dst+1]=out[src+1];out[dst+2]=out[src+2];out[dst+3]=out[src+3];
+    }
+   }
+  }
+ }
+ return{width:L.width,height:L.height,buffer:out.buffer,
+  statistics:{lights:sources.length,samples:count,occlusions:rays,minAO,
+   texelsPerMeter:L.ppm,atlasWidth:L.width,atlasHeight:L.height,charts:rooms.length*6,padding:L.padding}};
+}
+
+if(typeof scope.importScripts==='function'&&!scope.CriptUV)scope.importScripts('uv-mapping.js?v=uv06');
+scope.CriptGIWorker={bake,bakeSurface};
 if(typeof scope.postMessage==='function'&&typeof scope.importScripts==='function'){
  scope.onmessage=event=>{
   try{
    const {token,...args}=event.data;
-   const result=bake(args);
+   const result=args.surfaceAtlas?bakeSurface(args):bake(args);
    scope.postMessage({token,result},[result.buffer]);
   }catch(error){scope.postMessage({token,error:String(error.stack||error)})}
  };
