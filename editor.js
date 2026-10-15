@@ -92,7 +92,7 @@ renderInspector(){const a=this.asset(),body=$('inspectorBody');body.replaceChild
    }else{
      const r=a.materialRecipe;
      this.field(body,'LAYOUT',r,'type','select',['wall','floor']);
-     for(const [title,key] of [['ROWS OF STONE','courses'],['BLOCKS PER ROW','columns'],['MORTAR DEPTH','depth'],['RELIEF STRENGTH','relief'],['LAYERED NOISE','noise'],['EROSION','erosion'],['WET SHEEN (0–1)','wetness'],['POLISHED EDGE SHEEN (0–1)','polish'],['PIXEL PAINT OVERLAY','overlay'],['RANDOM SEED','seed']]){
+     for(const [title,key] of [['ROWS OF STONE','courses'],['BLOCKS PER ROW','columns'],['MORTAR DEPTH','depth'],['RELIEF STRENGTH','relief'],['LAYERED NOISE','noise'],['EROSION','erosion'],['BLOCK COLOR VARIATION','variation'],['STONE FRACTURES','fractures'],['PHOTOGRAPHIC DETAIL','photoInfluence'],['WET SHEEN (0–1)','wetness'],['POLISHED EDGE SHEEN (0–1)','polish'],['PIXEL PAINT OVERLAY','overlay'],['RANDOM SEED','seed']]){
        this.field(body,title,r,key,'number');
      }
    }
