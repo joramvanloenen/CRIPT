@@ -18,7 +18,7 @@ const createSurfaceAtlasShader=L=>[
  'vec2 chartOrigin=vec2(room.x*'+L.cellW+'.0+col*'+L.patchW+'.0+'+L.padding+'.0,',
  ' room.y*'+L.cellH+'.0+(row<0.5?0.0:(row<1.5?'+L.planeH+'.0:'+ (L.planeH+L.wallH)+'.0))+'+L.padding+'.0);',
  'vec2 metric=face<1.5?local:(face<3.5?vec2(local.y,p.y):vec2(local.x,p.y));',
- 'metric=clamp(metric,vec2(0.0),vec2('+L.roomMeters+','+L.maxHeight+'));',
+ 'metric=clamp(metric,vec2(0.0),face<1.5?vec2('+L.roomMeters+'):vec2('+L.roomMeters+','+L.maxHeight+'));',
  'vec2 maximum=vec2('+ (L.floorPx-1)+'.0,row<0.5?'+(L.floorPx-1)+'.0:'+(L.wallPx-1)+'.0);',
  'vec2 coord=chartOrigin+clamp(metric*'+L.ppm+'.0-vec2(.5),vec2(0.0),maximum)+vec2(.5);',
  'return texture2D(criptGIAtlas,coord/vec2('+L.width+'.0,'+L.height+'.0));',
