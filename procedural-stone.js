@@ -42,11 +42,27 @@ function recipeFor(asset){
 // Each world panel uses a seeded variation; the generated tile is self-contained.
 function stoneCell(u,v,cols,rows,seed,floor){
  const yy=v*rows,course=Math.floor(yy),cy=fract(yy);
- let colsHere=floor?2+(hash(course,7,seed)>.55?1:0):
-   Math.max(1,cols+(hash(course,12,seed)>.65?1:hash(course,13,seed)<.24?-1:0));
- const shift=(course&1)?.37+.22*hash(course,99,seed):.08*hash(course,19,seed);
- const xx=u*colsHere+shift,stone=Math.floor(xx),cx=fract(xx),id=(course*31+stone);
- return {course,stone,id,colsHere,cx,cy,du:Math.min(cx,1-cx)/colsHere,dv:Math.min(cy,1-cy)/rows};
+ // Tile Sampler inspired weighted partitions, normalized so the left and
+ // right boundaries always end with real mortar rather than cut-off bricks.
+ const totalBlocks=floor?2+(hash(course,7,seed)>.55?1:0):
+   Math.max(2,cols+1+(hash(course,12,seed)>.55?1:0));
+ let total=0;
+ const weights=[];
+ for(let n=0;n<totalBlocks;n++){
+  const w=.64+hash(course*17+n,seed+11,n*13)*.92;
+  weights.push(w);total+=w;
+ }
+ let left=0,block=totalBlocks-1,cx=1,du=0;
+ for(let n=0;n<totalBlocks;n++){
+  const width=weights[n]/total,right=left+width;
+  if(u<right||n===totalBlocks-1){
+   block=n;cx=clamp((u-left)/width,0,1);
+   du=Math.min(u-left,right-u);break;
+  }
+  left=right;
+ }
+ return{course,stone:block,id:course*31+block,colsHere:totalBlocks,cx,cy,
+   du:Math.max(0,du),dv:Math.min(cy,1-cy)/rows};
 }
 function build(asset,{size=128,cut=false,variant=0,photo=null}={}){
  const r=recipeFor(asset),N=clamp(Math.floor(size),32,256),len=N*N;
