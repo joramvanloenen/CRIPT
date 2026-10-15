@@ -70,8 +70,8 @@ function build(asset,{size=128,cut=false,variant=0,photo=null}={}){
   cols=clamp(Math.round(r.columns||2),1,8),rows=clamp(Math.round(r.courses||4),1,12);
  const erosion=clamp(+r.erosion,0,1),relief=clamp(+r.relief,0,2),depth=clamp(+r.depth,0,1.5),
   grain=clamp(+r.noise,0,2),wet=clamp(+r.wetness||0,0,1),polish=clamp(+r.polish||0,0,1),
-  variation=clamp(+r.variation||.85,0,2),fractures=clamp(+r.fractures||.55,0,2),
-  photoInfluence=clamp(+r.photoInfluence||.50,0,1),
+  variation=clamp(r.variation==null?.85:+r.variation,0,2),fractures=clamp(r.fractures==null?.55:+r.fractures,0,2),
+  photoInfluence=clamp(r.photoInfluence==null?.50:+r.photoInfluence,0,1),
   overlay=clamp(+r.overlay||0,0,.5);
  const floor=r.type==='floor',moss=asset?.id==='moss';
  const heights=new Float32Array(len),albedo=new Uint8Array(len*4),
