@@ -47,7 +47,7 @@ const data=P.encode(32,32,rgba),back=P.decode(data);
 assert.equal(back.width,32);assert.equal(back.height,32);
 assert.deepEqual([...back.rgba],[...rgba],'PNG encode/decode roundtrip should preserve transparency and colors');
 const html=fs.readFileSync('index.html','utf8');
-assert.ok(html.indexOf('src="mesh-forge.js?v=quarry04"')<html.indexOf('src="mesh-vision.js?v=quarry04"')&&
- html.indexOf('src="mesh-vision.js?v=quarry04"')<html.indexOf('src="data.js?v=quarry04"'),'visual engine needs mesh kernel before project');
-assert.ok(html.includes('src="mesh-vision-workshop.js?v=quarry04"'),'integrated visual workshop missing');
+assert.ok(html.indexOf('src="mesh-forge.js?v=lighting05"')<html.indexOf('src="mesh-vision.js?v=lighting05"')&&
+ html.indexOf('src="mesh-vision.js?v=lighting05"')<html.indexOf('src="data.js?v=lighting05"'),'visual engine needs mesh kernel before project');
+assert.ok(html.includes('src="mesh-vision-workshop.js?v=lighting05"'),'integrated visual workshop missing');
 console.log('PASS: orthographic raster, silhouette targets, iterative improvement, PNG reference mask, RGB diff and UI script integration');
