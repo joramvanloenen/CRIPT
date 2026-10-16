@@ -118,4 +118,15 @@ const roofSide=UV.chart(L,0,0,1);
 const leftAt=(roofSide.y+Math.floor(roofSide.h/2))*L.width+roofSide.x+Math.floor(roofSide.w*.23);
 const sampleChange=Array.from({length:4},(_,k)=>Math.abs(curved[leftAt*4+k]-px[leftAt*4+k])).reduce((a,b)=>a+b,0);
 assert.ok(sampleChange>1,'Vault lightmap must respond to actual curved roof geometry');
+// A slow full-world bake must show the starting room before it completes.
+const moreRoom={...room,gx:1,gz:0},progress=[];
+const streaming=sandbox.CriptGIWorker.bakeSurface({layout:L,
+ rooms:[room,moreRoom],sources:[torch]},update=>progress.push(update));
+assert.equal(progress.length,1,'Worker must publish the first room before the full atlas');
+assert.equal(progress[0].completedRooms,1);
+assert.equal(progress[0].totalRooms,2);
+assert.equal(progress[0].buffer.byteLength,L.width*L.height*4);
+const early=new Uint8Array(progress[0].buffer),done=new Uint8Array(streaming.buffer);
+const center=(Math.floor(floor.y+floor.h/2)*L.width+Math.floor(floor.x+floor.w/2))*4;
+assert.equal(early[center],done[center],'Early lightmap must match the final first-room bake');
 console.log('PASS: texel density, UV2 no overlaps, 2px padded charts, physical diffuse scale, floor/roof lighting and baked AO');
