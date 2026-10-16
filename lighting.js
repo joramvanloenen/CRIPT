@@ -109,9 +109,9 @@ class BakedLighting{
    // It pools against low masonry, revealing silhouettes above the mist.
    shader.fragmentShader=shader.fragmentShader.replace('#include <fog_fragment>',[
     '#include <fog_fragment>',
-    'float criptFogHeight=exp(-max(0.0,vCriptBakedWorld.y-.18)*1.45);',
-    'float criptFogDistance=1.0-exp(-distance(vCriptBakedWorld,cameraPosition)*.082);',
-    'float criptFog=clamp(criptFogHeight*criptFogDistance*criptHeightFogDensity,0.0,.68);',
+    'float criptFogHeight=exp(-max(0.0,vCriptBakedWorld.y-.32)*.93);',
+    'float criptFogDistance=1.0-exp(-distance(vCriptBakedWorld,cameraPosition)*.115);',
+    'float criptFog=clamp(criptFogHeight*criptFogDistance*criptHeightFogDensity,0.0,.82);',
     'if(criptDebugMode<.5)gl_FragColor.rgb=mix(gl_FragColor.rgb,criptHeightFogColor,criptFog);'
    ].join(String.fromCharCode(10)));
 
@@ -264,7 +264,7 @@ class BakedLighting{
  setFog(atmosphere){
   if(!atmosphere)return;
   this.fogColor.value.set(atmosphere.fog||'#284744');
-  this.fogDensity.value=Math.max(0,Math.min(1,Number(atmosphere.heightFog)||.4));
+  this.fogDensity.value=Math.max(0,Math.min(1.35,(Number(atmosphere.heightFog)||.4)*1.68));
  }
  update(x,z,time){
   this.timeUniform.value=time;
