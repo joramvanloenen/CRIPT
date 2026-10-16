@@ -5,6 +5,9 @@
 'use strict';
 const C=window.Cript,T=window.THREE;
 if(!C||!T)return;
+// A dedicated lightmap-coordinate varying is calculated independently from
+// diffuse UV0. UV2 is intentionally NOT sampled by this instanced GI renderer:
+// shared mesh UV2 has no way to identify which room / world tile is rendered.
 const createSurfaceAtlasShader=L=>[
  'vec4 criptSampleBakedLight(vec3 p,vec3 n){',
  'vec2 room=floor(clamp(p.xz / 16.2,vec2(0.0),vec2(3.9999)));',
@@ -14,16 +17,22 @@ const createSurfaceAtlasShader=L=>[
  'if(faceAbs.y>=0.5 && faceAbs.y>=max(faceAbs.x,faceAbs.z)*0.85)face=n.y>=0.0?0.0:1.0;',
  'else if(faceAbs.x>faceAbs.z)face=n.x>=0.0?2.0:3.0;',
  'else face=n.z>=0.0?4.0:5.0;',
- 'float row=floor(face/2.0),col=mod(face,2.0);',
- 'vec2 chartOrigin=vec2(room.x*'+L.cellW+'.0+col*'+L.patchW+'.0+'+L.padding+'.0,',
- ' room.y*'+L.cellH+'.0+(row<0.5?0.0:(row<1.5?'+L.planeH+'.0:'+ (L.planeH+L.wallH)+'.0))+'+L.padding+'.0);',
- 'vec2 metric=face<1.5?local:(face<3.5?vec2(local.y,p.y):vec2(local.x,p.y));',
- 'metric=clamp(metric,vec2(0.0),face<1.5?vec2('+L.roomMeters+'):vec2('+L.roomMeters+','+L.maxHeight+'));',
- 'vec2 maximum=vec2('+ (L.floorPx-1)+'.0,row<0.5?'+(L.floorPx-1)+'.0:'+(L.wallPx-1)+'.0);',
- 'vec2 coord=chartOrigin+clamp(metric*'+L.ppm+'.0-vec2(.5),vec2(0.0),maximum)+vec2(.5);',
- 'return texture2D(criptGIAtlas,coord/vec2('+L.width+'.0,'+L.height+'.0));',
+ 'float density=face<1.5?'+L.ppm+'.0:'+L.wallPpm+'.0;',
+ 'float depthCoord=face<3.5?local.x:local.y;',
+ 'float depthBias=mod(face,2.0)<.5?-.005:.005;',
+ 'float depthLayer=clamp(floor((depthCoord+depthBias)/'+L.tileMeters+'),0.0,'+(L.wallSlices-1)+'.0);',
+ 'float localX=face<1.5?local.x:(face<3.5?local.y:local.x);',
+ 'float localY=face<1.5?local.y:p.y;',
+ 'vec2 atlasOrigin=vec2(',
+ 'room.x*'+L.cellW+'.0+(face<1.5?(face<.5?0.0:'+L.patchW+'.0):((face-2.0)*'+L.wallPatchW+'.0))+'+L.padding+'.0,',
+ 'room.y*'+L.cellH+'.0+(face<1.5?0.0:('+L.planeH+'.0+depthLayer*'+L.wallPatchH+'.0))+'+L.padding+'.0',
+ ');',
+ 'vec2 extent=face<1.5?vec2('+(L.floorPx-1)+'.0):vec2('+(L.wallPx-1)+'.0,'+(L.wallHPx-1)+'.0);',
+ 'vec2 localMetric=vec2(localX,localY);',
+ 'vec2 uv=atlasOrigin+clamp(localMetric*density-.5,vec2(0.0),extent)+vec2(.5);',
+ 'return texture2D(criptGIAtlas,uv/vec2('+L.width+'.0,'+L.height+'.0));',
  '}'
-].join('\n');
+].join('\\n');
 class BakedLighting{
  constructor(scene,world,project){
   this.scene=scene;this.world=world;this.project=project;
@@ -61,7 +70,15 @@ class BakedLighting{
     'vCriptBakedWorld=(modelMatrix*criptProbePoint).xyz;',
     'vec3 criptFaceNormal=normal;',
     '#ifdef USE_INSTANCING',
-    '  criptFaceNormal=mat3(instanceMatrix)*criptFaceNormal;',
+    '  vec3 criptS0=instanceMatrix[0].xyz;',
+    '  vec3 criptS1=instanceMatrix[1].xyz;',
+    '  vec3 criptS2=instanceMatrix[2].xyz;',
+    // Proper inverse-transpose direction for differently scaled instances.
+    // Multiplying mat3(instanceMatrix)*normal was wrong for sloped arches,
+    // wedges and non-uniformly stretched model assets.
+    '  criptFaceNormal=mat3(instanceMatrix)*(criptFaceNormal/vec3(',
+    '    max(dot(criptS0,criptS0),.00001),max(dot(criptS1,criptS1),.00001),',
+    '    max(dot(criptS2,criptS2),.00001)));',
     '#endif',
     'vCriptWorldNormal=normalize(mat3(modelMatrix)*criptFaceNormal);',
     // UV0 is measured in world meters, not local model units, so an instanced
@@ -118,7 +135,7 @@ class BakedLighting{
 
   };
   const oldKey=material.customProgramCacheKey?.bind(material);
-  material.customProgramCacheKey=()=>String(oldKey?oldKey():'')+'|cript-baked-gi-v6-' + this.layout.ppm;
+  material.customProgramCacheKey=()=>String(oldKey?oldKey():'')+'|cript-surface-gi-v7-' + this.layout.ppm+'-'+this.layout.wallPpm;
   material.needsUpdate=true;this.materials.push(material);
  }
  sources(){
@@ -175,7 +192,7 @@ class BakedLighting{
  }
  cacheKey(payload){
   const signature=JSON.stringify({rooms:payload.rooms,sources:payload.sources,
-    nx:payload.nx,nz:payload.nz,ny:payload.ny,ver:'surface-charts-uv6',layout:payload.layout});
+    nx:payload.nx,nz:payload.nz,ny:payload.ny,ver:'depth-sliced-charts-uv7',layout:payload.layout});
   let hash=2166136261;
   for(let i=0;i<signature.length;i++){
    hash^=signature.charCodeAt(i);hash=Math.imul(hash,16777619);
@@ -243,7 +260,7 @@ class BakedLighting{
    if(typeof Worker!=='undefined'&&(typeof location==='undefined'||location.protocol!=='file:')){
     try{
      if(this.worker)this.worker.terminate();
-     const worker=new Worker('lighting-bake-worker.js?v=uv06');
+     const worker=new Worker('lighting-bake-worker.js?v=uv07');
      this.worker=worker;
      worker.onmessage=e=>{finish(e.data);worker.terminate();if(this.worker===worker)this.worker=null};
      worker.onerror=()=>{worker.terminate();if(this.worker===worker)this.worker=null;fallback()};
@@ -256,7 +273,7 @@ class BakedLighting{
    if(this.disposed||token!==this.generation)return;
    if(buffer&&buffer.byteLength===this.layout.width*this.layout.height*4)
     finish({token,result:{buffer,statistics:{lights:payload.sources.length,
-      samples:0,occlusions:0,charts:96,texelsPerMeter:this.layout.ppm,padding:this.layout.padding}}},true);
+      samples:0,occlusions:0,charts:16*(2+4*this.layout.wallSlices),texelsPerMeter:this.layout.ppm,wallTexelsPerMeter:this.layout.wallPpm,padding:this.layout.padding}}},true);
    else runWorker();
   }).catch(runWorker);
  }
