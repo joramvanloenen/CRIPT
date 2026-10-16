@@ -49,6 +49,24 @@ for(const L of [lo,med,hi]){
  const boundary=UV.chartCoordinates(L,[16.2,2.3,8.1],[1,0,0]);
  assert.equal(boundary.roomX,0,'Shared boundary must remain with solid whose outward face it is');
 }
+// World-space vertex coordinates can cross the 1.8m wall tile boundary
+// while their INSTANCED MESH ORIGIN remains inside the correct solid tile.
+// UV8 sampled a different lightmap slice on these near-identical surfaces.
+for(const L of [lo,med,hi]){
+ const eNormal=[1,0,0], wNormal=[-1,0,0],zNormal=[0,0,1];
+ const outside=UV.chartCoordinates(L,[1.81,2.5,3.4],eNormal,[1.70,2.5,3.4]);
+ const inside=UV.chartCoordinates(L,[1.79,2.5,3.4],eNormal,[1.70,2.5,3.4]);
+ assert.equal(outside.slice,0,'Wall face extending 1cm outside tile must keep own chart');
+ assert.equal(inside.slice,outside.slice);
+ assert.equal(inside.texelX,outside.texelX,'Adjacent parallel wall texels must not jump when X crosses tile edge');
+ const west=UV.chartCoordinates(L,[-.01,2.5,3.4],wNormal,[.1,2.5,3.4]);
+ assert.equal(west.slice,0,'Negative-normal wall face must remain with own voxel');
+ const next=UV.chartCoordinates(L,[3.61,2.5,3.4],eNormal,[3.5,2.5,3.4]);
+ assert.equal(next.slice,1,'Different solid tile must use separate lightmap chart');
+ assert.notEqual(next.v,outside.v);
+ const crossing=UV.chartCoordinates(L,[1.81,2.5,16.21],zNormal,[1.70,2.5,16.1]);
+ assert.equal(crossing.roomZ,0,'Instanced faces may cross room boundary but remain in their original chart');
+}
 assert.ok(UV.diffuseUV([3.6,4.5,5.4],[0,1,0]).every((v,i)=>Math.abs(v-[2,3][i])<1e-6));
 assert.ok(UV.diffuseUV([3.6,4.5,5.4],[1,0,0]).every((v,i)=>Math.abs(v-[3,2.5][i])<1e-6));
 class Attr{
