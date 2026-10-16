@@ -10,21 +10,45 @@ assert.deepEqual([lo.ppm,med.ppm,hi.ppm],[3,6,8]);
 assert.ok(lo.width<=med.width&&med.width<=hi.width);
 for(const L of [lo,med,hi]){
  assert.equal(L.padding,2);
+ assert.equal(L.wallSlices,9);
+ assert.ok(L.wallPpm<L.ppm,'Lightmap wall resolution is budgeted separately from floor');
+ assert.ok(L.width<=4096&&L.height<=8192,'Atlas dimensions must fit a practical GPU texture');
+ let charts=0;const rects=[];
  for(let rz=0;rz<4;rz++)for(let rx=0;rx<4;rx++)for(let side=0;side<6;side++){
-  const tile=UV.chart(L,rx,rz,side);
-  assert.ok(tile.x>=2&&tile.y>=2);
-  assert.ok(tile.x+tile.w+2<=L.width&&tile.y+tile.h+2<=L.height,'Atlas chart overflow');
-  const normal=[[0,1,0],[0,-1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1]][side];
-  const pos=[rx*16.2+8.1,2.3,rz*16.2+8.1];
-  const uv=UV.chartCoordinates(L,pos,normal);
-  assert.equal(uv.side,side);
-  assert.ok(uv.texelX>=tile.x+.5&&uv.texelX<=tile.x+tile.w-.5);
-  assert.ok(uv.texelY>=tile.y+.5&&uv.texelY<=tile.y+tile.h-.5);
+  const sliceCount=side<2?1:9;
+  for(let slice=0;slice<sliceCount;slice++){
+   const tile=UV.chart(L,rx,rz,side,slice);
+   assert.ok(tile.x>=2&&tile.y>=2);
+   assert.ok(tile.x+tile.w+2<=L.width&&tile.y+tile.h+2<=L.height,'Atlas chart overflow');
+   const normal=[[0,1,0],[0,-1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1]][side];
+   const pos=[rx*16.2+(side===2?(slice+1)*1.8:side===3?slice*1.8:8.1),
+       2.3,rz*16.2+(side===4?(slice+1)*1.8:side===5?slice*1.8:8.1)];
+   const uv=UV.chartCoordinates(L,pos,normal);
+   assert.equal(uv.side,side);
+   assert.equal(uv.slice,slice,'Wall must sample its own physical chart layer');
+   assert.ok(uv.texelX>=tile.x+.5&&uv.texelX<=tile.x+tile.w-.5);
+   assert.ok(uv.texelY>=tile.y+.5&&uv.texelY<=tile.y+tile.h-.5);
+   rects.push(tile);charts++;
+  }
  }
- const a=UV.chart(L,0,0,0),b=UV.chart(L,0,0,1);
- assert.ok(b.x-(a.x+a.w)>=L.padding*2,'Insufficient pad between floor and ceiling charts');
- const c=UV.chart(L,0,0,2);
- assert.ok(c.y-(a.y+a.h)>=L.padding*2,'Insufficient pad between unrelated surface charts');
+ assert.equal(charts,16*38,'Six directions with 9 depth bins on four walls');
+ // True atlas non-overlap, including both 2-pixel chart gutters.
+ const coord=new Set();
+ for(const c of rects){
+  for(let x=c.x-c.pad;x<c.x+c.w+c.pad;x++)
+   for(let y=c.y-c.pad;y<c.y+c.h+c.pad;y++){
+    const key=y*L.width+x;
+    assert.ok(!coord.has(key),'Lighting charts share texels: '+JSON.stringify(c));
+    coord.add(key);
+   }
+ }
+ const a=UV.chart(L,0,0,2,0),b=UV.chart(L,0,0,2,8);
+ assert.notEqual(a.y,b.y,'Distant same-direction walls cannot share texels');
+ const pNear=UV.chartCoordinates(L,[1.8,2.3,8.1],[1,0,0]);
+ const pFar=UV.chartCoordinates(L,[14.4,2.3,8.1],[1,0,0]);
+ assert.notEqual(pNear.v,pFar.v,'Same-normal distant walls cannot sample identical charts');
+ const boundary=UV.chartCoordinates(L,[16.2,2.3,8.1],[1,0,0]);
+ assert.equal(boundary.roomX,0,'Shared boundary must remain with solid whose outward face it is');
 }
 assert.ok(UV.diffuseUV([3.6,4.5,5.4],[0,1,0]).every((v,i)=>Math.abs(v-[2,3][i])<1e-6));
 assert.ok(UV.diffuseUV([3.6,4.5,5.4],[1,0,0]).every((v,i)=>Math.abs(v-[3,2.5][i])<1e-6));
@@ -60,17 +84,25 @@ const L=UV.layout('low'),torch={x:8.1,y:1.7,z:8.1,radius:10,power:2,color:[1,.44
 const result=sandbox.CriptGIWorker.bakeSurface({layout:L,rooms:[room],sources:[torch]});
 assert.equal(result.width,L.width);assert.equal(result.height,L.height);
 assert.equal(result.buffer.byteLength,L.width*L.height*4);
-assert.equal(result.statistics.charts,6);
+assert.equal(result.statistics.charts,38);
 assert.equal(result.statistics.texelsPerMeter,L.ppm);
 assert.equal(result.statistics.padding,2);
 const px=new Uint8Array(result.buffer),sample=(x,y)=>
  Array.from(px.slice((y*L.width+x)*4,(y*L.width+x)*4+4));
-for(let side=0;side<6;side++){
- const c=UV.chart(L,0,0,side);
+for(let side=0;side<6;side++)for(let slice=0;slice<(side<2?1:9);slice++){
+ const c=UV.chart(L,0,0,side,slice);
  const edge=sample(c.x,c.y);
  assert.deepEqual(sample(c.x-1,c.y-1),edge,'Corner gutter must reproduce nearest chart texel');
  assert.deepEqual(sample(c.x+c.w,c.y+c.h),sample(c.x+c.w-1,c.y+c.h-1),'Far corner gutter must be dilated');
 }
+const leftWall=UV.chart(L,0,0,2,0),rightWall=UV.chart(L,0,0,2,6);
+const diffAt=(c)=>{
+ const x=c.x+Math.floor(c.w/2),y=c.y+Math.floor(c.h/3);
+ return sample(x,y);
+};
+const firstWall=diffAt(leftWall),lastWall=diffAt(rightWall);
+assert.ok(Math.abs(firstWall[0]-lastWall[0])+Math.abs(firstWall[1]-lastWall[1])+
+ Math.abs(firstWall[3]-lastWall[3])>2,'Separate physical wall slices must have distinct lighting');
 const floor=UV.chart(L,0,0,0),roof=UV.chart(L,0,0,1);
 const floorMiddle=sample(floor.x+Math.floor(floor.w/2),floor.y+Math.floor(floor.h/2));
 const roofMiddle=sample(roof.x+Math.floor(roof.w/2),roof.y+Math.floor(roof.h/2));
