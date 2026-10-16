@@ -110,4 +110,13 @@ assert.ok(floorMiddle[0]>floorMiddle[2],'Firelight must tint the floor warm');
 assert.ok(Math.abs(floorMiddle[0]-roofMiddle[0])>2,'Floor and roof must bake separate lighting, not share height probes');
 const nearEdge=sample(floor.x+2,floor.y+2);
 assert.ok(nearEdge[3]<floorMiddle[3],'Floor corners must have stronger baked occlusion');
+// The ceiling chart must be baked on the actual vaulted stone, not on an
+// imaginary plane above the spring line.
+const vaulted=sandbox.CriptGIWorker.bakeSurface({layout:L,
+ rooms:[{...room,vault:'ribbed'}],sources:[torch]});
+const curved=new Uint8Array(vaulted.buffer);
+const roofSide=UV.chart(L,0,0,1);
+const leftAt=(roofSide.y+Math.floor(roofSide.h/2))*L.width+roofSide.x+Math.floor(roofSide.w*.23);
+const sampleChange=Array.from({length:4},(_,k)=>Math.abs(curved[leftAt*4+k]-px[leftAt*4+k])).reduce((a,b)=>a+b,0);
+assert.ok(sampleChange>1,'Vault lightmap must respond to actual curved roof geometry');
 console.log('PASS: texel density, UV2 no overlaps, 2px padded charts, physical diffuse scale, floor/roof lighting and baked AO');
