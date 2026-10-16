@@ -50,8 +50,9 @@ function chart(layout,roomX,roomZ,side,slice=0){
   w:layout.wallPx,h:layout.wallHPx,pad:layout.padding,
   side,slice:depth,roomX,roomZ};
 }
-function chartCoordinates(layout,position,normal,anchor=position){
+function chartCoordinates(layout,position,normal,anchor=null){
  const side=face(normal);
+ if(!anchor)anchor=[position[0]-normal[0]*.12,position[1]-normal[1]*.12,position[2]-normal[2]*.12];
  const roomX=clamp(Math.floor(anchor[0]/ROOM),0,3),
   roomZ=clamp(Math.floor(anchor[2]/ROOM),0,3);
  const local=[clamp(position[0]-roomX*ROOM,0,ROOM),position[1],
