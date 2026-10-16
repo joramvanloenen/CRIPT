@@ -178,9 +178,12 @@ function textures(T,asset,{quality='medium',cut=false,variant=0,photo=null}={}){
  const make=(pixels,srgb=false)=>{
   const tex=new T.DataTexture(pixels,size,size,T.RGBAFormat,T.UnsignedByteType);
   tex.wrapS=tex.wrapT=T.RepeatWrapping;
-  tex.magFilter=T.LinearFilter||T.NearestFilter;
-  tex.minFilter=T.LinearMipmapLinearFilter||T.NearestMipmapNearestFilter||T.NearestFilter;
-  tex.generateMipmaps=true;tex.flipY=false;
+  // Pixel-perfect albedo, normals and roughness at all distances.
+  tex.magFilter=T.NearestFilter;
+  tex.minFilter=T.NearestFilter;
+  tex.generateMipmaps=false;
+  tex.anisotropy=1;
+  tex.flipY=false;
   if(srgb)tex.colorSpace=T.SRGBColorSpace;
   tex.needsUpdate=true;return tex;
  };
@@ -202,6 +205,7 @@ function loadPhotographicReference(){
    try{
     const canvas=document.createElement('canvas');canvas.width=canvas.height=256;
     const ctx=canvas.getContext('2d',{willReadFrequently:true});
+    ctx.imageSmoothingEnabled=false;
     ctx.drawImage(img,0,0,256,256);
     const frame=ctx.getImageData(0,0,256,256);
     reference={width:256,data:frame.data,source:PHOTO_URL,license:'CC0'};
