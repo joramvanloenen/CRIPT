@@ -33,14 +33,13 @@ for(const L of [lo,med,hi]){
  }
  assert.equal(charts,16*38,'Six directions with 9 depth bins on four walls');
  // True atlas non-overlap, including both 2-pixel chart gutters.
- const coord=new Set();
- for(const c of rects){
-  for(let x=c.x-c.pad;x<c.x+c.w+c.pad;x++)
-   for(let y=c.y-c.pad;y<c.y+c.h+c.pad;y++){
-    const key=y*L.width+x;
-    assert.ok(!coord.has(key),'Lighting charts share texels: '+JSON.stringify(c));
-    coord.add(key);
-   }
+ for(let i=0;i<rects.length;i++)for(let j=i+1;j<rects.length;j++){
+  const a=rects[i],b=rects[j];
+  const separated=a.x+a.w+a.pad<=b.x-b.pad||
+    b.x+b.w+b.pad<=a.x-a.pad||
+    a.y+a.h+a.pad<=b.y-b.pad||
+    b.y+b.h+b.pad<=a.y-a.pad;
+  if(!separated)assert.fail('Overlapping atlas chart rectangles: '+i+' / '+j);
  }
  const a=UV.chart(L,0,0,2,0),b=UV.chart(L,0,0,2,8);
  assert.notEqual(a.y,b.y,'Distant same-direction walls cannot share texels');
