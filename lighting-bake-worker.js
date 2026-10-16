@@ -132,34 +132,19 @@ function bakeSurface(input){
    if(occupied(p[0]+dx*t,p[2]+dz*t,p[1]+dy*t))return true;
   }return false;
  };
- function samplePosition(r,side,tx,ty){
+ function samplePosition(r,side,slice,tx,ty){
   const x0=r.gx*L.roomMeters,z0=r.gz*L.roomMeters;
-  const u=Math.min(L.roomMeters,(tx+.5)/L.ppm),v=Math.min(L.maxHeight,(ty+.5)/L.ppm);
+  const density=side<2?L.ppm:L.wallPpm;
+  const u=Math.min(L.roomMeters,(tx+.5)/density),v=Math.min(L.maxHeight,(ty+.5)/density);
   if(side===0)return[[x0+u,.055,z0+v],[0,1,0]];
   if(side===1)return[[x0+u,r.height-.12,z0+v],[0,-1,0]];
-  if(side===2||side===3){
-   const zi=Math.max(0,Math.min(8,Math.floor(u/1.8))),row=4;
-   let x=(side===2?0:9)*1.8;
-   for(let j=0;j<5;j++){
-    const xi=side===2?4-j:4+j;
-    if(xi<0||xi>8)break;
-    if(r.solid[zi*9+xi]){
-     x=(side===2?(xi+1)*1.8:xi*1.8);
-     break;
-    }
-   }
-   return[[x0+x+(side===2?.10:-.10),Math.min(v,r.height-.08),z0+u],side===2?[1,0,0]:[-1,0,0]];
-  }
-  const xi=Math.max(0,Math.min(8,Math.floor(u/1.8)));
-  let z=(side===4?0:9)*1.8;
-  for(let j=0;j<5;j++){
-   const zi=side===4?4-j:4+j;
-   if(zi<0||zi>8)break;
-   if(r.solid[zi*9+xi]){
-    z=(side===4?(zi+1)*1.8:zi*1.8);break;
-   }
-  }
-  return[[x0+u,Math.min(v,r.height-.08),z0+z+(side===4?.10:-.10)],side===4?[0,0,1]:[0,0,-1]];
+  // Every chart must bake the SAME physical tile surface that the renderer
+  // addresses. No longer project every east-facing wall onto a single
+  // guessed wall near the middle of its room.
+  if(side===2)return[[x0+(slice+1)*L.tileMeters+.075,v,z0+u],[1,0,0]];
+  if(side===3)return[[x0+slice*L.tileMeters-.075,v,z0+u],[-1,0,0]];
+  if(side===4)return[[x0+u,v,z0+(slice+1)*L.tileMeters+.075],[0,0,1]];
+  return[[x0+u,v,z0+slice*L.tileMeters-.075],[0,0,-1]];
  }
  const dirs=[[1,0],[-1,0],[0,1],[0,-1],[.707,.707],[-.707,.707],[.707,-.707],[-.707,-.707]];
  const contacts=[.32,.70,1.35],influence=[.14,.09,.045];
@@ -167,10 +152,11 @@ function bakeSurface(input){
  for(const room of rooms){
   const lights=sources.filter(l=>Math.hypot(l.x-(room.gx+.5)*L.roomMeters,l.z-(room.gz+.5)*L.roomMeters)<l.radius+11);
   for(let side=0;side<6;side++){
-   const chart=U.chart(L,room.gx,room.gz,side),{w,h}=chart;
+   for(let slice=0;slice<(side<2?1:L.wallSlices);slice++){
+    const chart=U.chart(L,room.gx,room.gz,side,slice),{w,h}=chart;
    const diffuse=new Float32Array(w*h*3),occlusion=new Float32Array(w*h);
    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-    const i=y*w+x,[p,n]=samplePosition(room,side,x,y);
+    const i=y*w+x,[p,n]=samplePosition(room,side,slice,x,y);
     let obstacle=0;
     for(const [dx,dz]of dirs)for(let k=0;k<3;k++){
      if(occupied(p[0]+dx*contacts[k],p[2]+dz*contacts[k],p[1]))
@@ -225,14 +211,15 @@ function bakeSurface(input){
      out[dst]=out[src];out[dst+1]=out[src+1];out[dst+2]=out[src+2];out[dst+3]=out[src+3];
     }
    }
+   }
   }
  }
  return{width:L.width,height:L.height,buffer:out.buffer,
   statistics:{lights:sources.length,samples:count,occlusions:rays,minAO,
-   texelsPerMeter:L.ppm,atlasWidth:L.width,atlasHeight:L.height,charts:rooms.length*6,padding:L.padding}};
+   texelsPerMeter:L.ppm,wallTexelsPerMeter:L.wallPpm,atlasWidth:L.width,atlasHeight:L.height,charts:rooms.length*(2+4*L.wallSlices),padding:L.padding}};
 }
 
-if(typeof scope.importScripts==='function'&&!scope.CriptUV)scope.importScripts('uv-mapping.js?v=uv06');
+if(typeof scope.importScripts==='function'&&!scope.CriptUV)scope.importScripts('uv-mapping.js?v=uv07');
 scope.CriptGIWorker={bake,bakeSurface};
 if(typeof scope.postMessage==='function'&&typeof scope.importScripts==='function'){
  scope.onmessage=event=>{
