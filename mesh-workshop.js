@@ -20,7 +20,7 @@ class ForgePreview{
   const fill=new T.DirectionalLight(0x83b5d2,1.7);fill.position.set(-4,3,-5);this.scene.add(fill);
   const rim=new T.DirectionalLight(0xc8d8f6,.7);rim.position.set(0,8,-3);this.scene.add(rim);
   this.camera=new T.PerspectiveCamera(48,1,.02,200);
-  this.renderer=new T.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});
+  this.renderer=new T.WebGLRenderer({antialias:false,alpha:false,powerPreference:'low-power'});
   this.renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));
   this.renderer.outputColorSpace=T.SRGBColorSpace;
   this.host.insertBefore(this.renderer.domElement,this.status);
