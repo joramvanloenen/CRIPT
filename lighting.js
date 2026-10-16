@@ -198,7 +198,7 @@ class BakedLighting{
  }
  cacheKey(payload){
   const signature=JSON.stringify({rooms:payload.rooms,sources:payload.sources,
-    nx:payload.nx,nz:payload.nz,ny:payload.ny,ver:'depth-sliced-charts-uv7',layout:payload.layout});
+    nx:payload.nx,nz:payload.nz,ny:payload.ny,ver:'depth-sliced-charts-uv7-vault',layout:payload.layout});
   let hash=2166136261;
   for(let i=0;i<signature.length;i++){
    hash^=signature.charCodeAt(i);hash=Math.imul(hash,16777619);
@@ -244,7 +244,7 @@ class BakedLighting{
  bake(token){
   if(token!==this.generation)return;
   const rooms=Object.values(this.project.rooms).map(r=>({
-   gx:r.gx,gz:r.gz,height:C.Masonry.config(r).height,
+   gx:r.gx,gz:r.gz,height:C.Masonry.config(r).height,vault:C.Masonry.config(r).vault,
    solid:r.tiles.map(id=>!!this.project.assets.textures[id]?.solid)
   }));
   const payload={surfaceAtlas:true,layout:this.layout,token,rooms,sources:this.sources()};
