@@ -6,7 +6,7 @@ if(!T){$('gameOverlay').innerHTML='<div class="opening"><h2>3D renderer unavaila
 const TAU=Math.PI*2, clamp=C.clamp;
 class CryptGame{
 constructor(){
- this.scene=new T.Scene();this.scene.background=new T.Color('#101a19');this.scene.fog=new T.FogExp2('#193d38',.063);
+ this.scene=new T.Scene();this.scene.background=new T.Color('#101a19');this.scene.fog=new T.FogExp2('#193d38',.11);
  this.camera=new T.PerspectiveCamera(76,1,.07,105);this.camera.rotation.order='YXZ';
  this.renderer=new T.WebGLRenderer({antialias:false,alpha:false,powerPreference:'high-performance'});
  this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.setPixelRatio(1);this.renderer.domElement.style.touchAction='none';$('webgl').appendChild(this.renderer.domElement);
@@ -152,7 +152,7 @@ bind(){
 }
 start(){this.hero=this.freshHero();this.flags.clear();this.chests.clear();this.seen.clear();this.time=0;this.bell=0;this.mode='free';this.room=null;this.running=true;this.paused=false;this.resetActors();this.makeWeapon();$('gameOverlay').classList.add('hide');$('pausePanel').classList.add('hide');$('deathPanel').classList.add('hide');this.checkRoom(true);this.hud()}
 pause(value){this.paused=value;this.keys.clear();$('pausePanel').classList.toggle('hide',!value);if(value&&document.pointerLockElement)document.exitPointerLock?.()}
-checkRoom(force=false){const r=C.roomAt(this.hero.x,this.hero.z);if(!r||(!force&&r===this.room))return;this.room=r;this.seen.add(r.id);$('roomName').textContent=r.name.toUpperCase();$('roomHint').textContent=r.clue||'Listen to the stones. They are not always silent.';$('depthChip').textContent='DEPTH '+String(r.gz+1).padStart(2,'0');const a=C.project.assets.atmosphere[r.theme]||C.project.assets.atmosphere.crypt;this.scene.fog.color.set(a.fog);this.scene.fog.density=a.density;this.scene.background.set(a.fog).multiplyScalar(.21);this.hemi.intensity=Math.min(.3,a.ambient*.56);this.lantern.intensity=a.torch*.48;this.lighting?.setFog(a);}
+checkRoom(force=false){const r=C.roomAt(this.hero.x,this.hero.z);if(!r||(!force&&r===this.room))return;this.room=r;this.seen.add(r.id);$('roomName').textContent=r.name.toUpperCase();$('roomHint').textContent=r.clue||'Listen to the stones. They are not always silent.';$('depthChip').textContent='DEPTH '+String(r.gz+1).padStart(2,'0');const a=C.project.assets.atmosphere[r.theme]||C.project.assets.atmosphere.crypt;this.scene.fog.color.set(a.fog);this.scene.fog.density=Math.min(.24,(Number(a.density)||.06)*1.60);this.scene.background.set(a.fog).multiplyScalar(.21);this.hemi.intensity=Math.min(.3,a.ambient*.56);this.lantern.intensity=a.torch*.48;this.lighting?.setFog(a);}
 can(x,z,r=.29){if(C.isSolid(x-r,z-r)||C.isSolid(x+r,z-r)||C.isSolid(x-r,z+r)||C.isSolid(x+r,z+r))return false;if(this.architecture?.blocked(x,z,r)||this.gateBlocks(x,z,r))return false;for(const o of this.props||[]){if(!o.active||!o.def.solid)continue;if(Math.abs(x-o.x)<r+.44&&Math.abs(z-o.z)<r+.44)return false}return true}
 move(dx,dz){const p=this.hero;if(this.can(p.x+dx,p.z))p.x+=dx;if(this.can(p.x,p.z+dz))p.z+=dz}
 turn(dir){if(!this.running||this.paused)return;this.hero.yaw=(this.hero.yaw+dir*.22+TAU)%TAU}
