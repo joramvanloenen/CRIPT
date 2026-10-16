@@ -111,7 +111,15 @@ assert.equal(C.game.lighting.debugUniform.value,3,'Chart ID debug view must be s
 assert.ok(shader.fragmentShader.includes('layer=side<1.5'),'Shader chart diagnostic must encode wall layer');
 C.game.lighting.setDebugMode(0);
 
-assert.ok(!shader.fragmentShader.includes('\\\\n'),'Shader source must contain real GLSL newline characters');
+// Reject BOTH one and multiple literal backslashes followed by "n": this
+// escaped GLSL separator broke the actual browser shader despite CI passing.
+assert.ok(!shader.fragmentShader.includes(String.fromCharCode(92,110)),
+ 'Generated GLSL contains literal backslash-n and will not compile');
+assert.ok(shader.fragmentShader.includes('}\nvoid main()')||
+ shader.fragmentShader.includes('}\n'+ 'void main()'),
+ 'Lightmap sampling function must end before the fragment main()');
+assert.ok(shader.fragmentShader.includes('vec4 criptSampleBakedLight(vec3 p,vec3 n){\n'),
+ 'Lightmap shader helper lines must be separated with actual newlines');
 assert.ok(shader.uniforms.criptGIAtlas===C.game.lighting.uniform,'Shared GI atlas must be shader-bound');
 
 assert.ok(C.masonryStats.arches>20,'Masonry voussoirs not built');
