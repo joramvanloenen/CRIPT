@@ -37,7 +37,7 @@ class BakedLighting{
  }
  makeTexture(data){
   const t=new T.DataTexture(data,this.layout.width,this.layout.height,T.RGBAFormat,T.UnsignedByteType);
-  t.wrapS=t.wrapT=T.ClampToEdgeWrapping;t.minFilter=t.magFilter=T.LinearFilter;
+  t.wrapS=t.wrapT=T.ClampToEdgeWrapping;t.minFilter=t.magFilter=T.NearestFilter;t.anisotropy=1;
   t.generateMipmaps=false;t.flipY=false;t.needsUpdate=true;return t;
  }
  attach(material){
