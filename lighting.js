@@ -120,7 +120,13 @@ class BakedLighting{
     'float criptSurfaceAO=clamp(criptBake.a*criptContactAO,.16,1.0);',
     'gl_FragColor.rgb*=mix(1.0,criptSurfaceAO,.76);',
     'if(criptDebugMode>1.5)gl_FragColor.rgb=criptBake.rgb;',
-    'else if(criptDebugMode>.5)gl_FragColor.rgb=vec3(criptSurfaceAO);'
+    'else if(criptDebugMode>.5 && criptDebugMode<2.5)gl_FragColor.rgb=vec3(criptSurfaceAO);',
+    'if(criptDebugMode>2.5){',
+    '  vec3 n=normalize(vCriptWorldNormal),a=abs(n);',
+    '  float side=(a.y>=.5&&a.y>=max(a.x,a.z)*.85)?(n.y>=0.0?0.0:1.0):(a.x>a.z?(n.x>=0.0?2.0:3.0):(n.z>=0.0?4.0:5.0));',
+    '  float layer=side<1.5?0.0:clamp(floor(((side<3.5?vCriptBakedWorld.x:vCriptBakedWorld.z)+.002)/1.8),0.0,8.0);',
+    '  gl_FragColor.rgb=vec3(fract((side+1.0)*.36+.15),fract((layer+1.0)*.21+.12),fract((side+layer+1.0)*.17+.2));',
+    '}'
    ].join('\n'));
    // Height fog is part of the world material, not a full-screen blur pass.
    // It pools against low masonry, revealing silhouettes above the mist.
@@ -277,7 +283,7 @@ class BakedLighting{
    else runWorker();
   }).catch(runWorker);
  }
- setDebugMode(mode=0){this.debugUniform.value=Math.max(0,Math.min(2,Math.round(mode)))}
+ setDebugMode(mode=0){this.debugUniform.value=Math.max(0,Math.min(3,Math.round(mode)))}
  setFog(atmosphere){
   if(!atmosphere)return;
   this.fogColor.value.set(atmosphere.fog||'#284744');
