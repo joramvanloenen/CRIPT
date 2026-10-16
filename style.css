@@ -75,7 +75,7 @@
 /* Mesh Forge: model is the main viewport, not a tiny thumbnail. */
 .forge-viewport{position:absolute;z-index:6;inset:0;background:#121c1f;display:flex;flex-direction:column;overflow:hidden}
 .forge-viewport[hidden]{display:none!important}
-.forge-viewport canvas{position:absolute;inset:0;width:100%!important;height:100%!important;display:block;cursor:grab;touch-action:none}
+.forge-viewport canvas{image-rendering:pixelated;position:absolute;inset:0;width:100%!important;height:100%!important;display:block;cursor:grab;touch-action:none}
 .forge-viewport canvas:active{cursor:grabbing}
 .forge-toolbar,.forge-status{position:absolute;left:14px;z-index:2;pointer-events:none;font:10px/1.6 ui-monospace,monospace;letter-spacing:.09em;color:#ded2b4;padding:5px 9px;background:#0b1215ae;border:1px solid #6d6f5d66}
 .forge-toolbar{top:12px}.forge-status{bottom:12px}
