@@ -70,6 +70,19 @@ assert.ok(C.game.lighting.sources().length>=30,'Static light sources must includ
 assert.equal(C.game.lighting.moons.length,4,'Exactly four rooms should have moonlit roof openings');
 const mat=C.game.architecture.mats.get('stone');
 assert.ok(mat.userData.criptBakedGI,'World materials must register baked shader hooks');
+const assertPixelTexture=(texture,label)=>{
+ assert.ok(texture,label+' texture missing');
+ assert.equal(texture.magFilter,T.NearestFilter,label+' magnification should use nearest');
+ assert.equal(texture.minFilter,T.NearestFilter,label+' minification should use nearest');
+ assert.equal(texture.generateMipmaps,false,label+' mipmaps must be disabled');
+ assert.equal(texture.anisotropy,1,label+' anisotropic filtering must be disabled');
+};
+for(const [i,tex] of C.game.architecture.surfaceTextures.entries())
+ assertPixelTexture(tex,'stone surface '+i);
+assertPixelTexture(C.game.lighting.texture,'baked GI and AO atlas');
+const sprite=C.project.assets.characters[Object.keys(C.project.assets.characters)[0]];
+assertPixelTexture(C.game.sceneTexture(sprite),'character sprite atlas');
+
 const shader={uniforms:{},vertexShader:'void main(){\n#include <project_vertex>\n}',fragmentShader:'void main(){\n#include <lights_fragment_maps>\n#include <opaque_fragment>\n#include <fog_fragment>\n}'};
 mat.onBeforeCompile(shader);
 assert.ok(shader.vertexShader.includes('instanceMatrix'),'Instanced geometry must compute baked sampling from world position');
@@ -200,7 +213,7 @@ assert.equal(game.room.id,'room-5');
 assert.ok(game.seen.has('room-5'),'Visiting the hidden room should reveal it');
 
 const html=fs.readFileSync('index.html','utf8'),css=fs.readFileSync('style.css','utf8');
-assert.ok(html.indexOf('src="weapons.js?v=fog07"')<html.indexOf('src="game.js?v=fog07"'),'Weapon rig must load before engine');
+assert.ok(html.indexOf('src="weapons.js?v=pixel08"')<html.indexOf('src="game.js?v=pixel08"'),'Weapon rig must load before engine');
 for(const key of ['q','e','w','a','s','d','f','attack','dodge','spell']){
  const m=html.match(new RegExp('<button[^>]*data-touch="'+key+'"[^>]*>([\\s\\S]*?)<\\/button>'));
  assert.ok(m&&m[1].includes('<svg'),'Touch button '+key+' must use a vector icon');
