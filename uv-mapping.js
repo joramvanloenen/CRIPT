@@ -8,40 +8,61 @@
 'use strict';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const nextPOT=x=>{let n=1;while(n<x)n*=2;return n};
-const ROOM=16.2,MAX_H=10,PAD=2;
+const ROOM=16.2,MAX_H=10,TILE=1.8,WALL_SLICES=9,PAD=2;
 const ppmFor=quality=>quality==='low'?3:quality==='high'?8:6;
+const wallPpmFor=quality=>quality==='low'?2:quality==='high'?5:4;
 function layout(quality='medium'){
- const ppm=ppmFor(quality),floorPx=Math.ceil(ROOM*ppm),wallPx=Math.ceil(MAX_H*ppm);
- const patchW=floorPx+PAD*2,planeH=floorPx+PAD*2,wallH=wallPx+PAD*2;
- const cellW=patchW*2,cellH=planeH+wallH*2;
- return{quality,ppm,padding:PAD,roomMeters:ROOM,maxHeight:MAX_H,
-  floorPx,wallPx,patchW,planeH,wallH,cellW,cellH,
+ const ppm=ppmFor(quality),wallPpm=wallPpmFor(quality);
+ const floorPx=Math.ceil(ROOM*ppm),wallPx=Math.ceil(ROOM*wallPpm),wallHPx=Math.ceil(MAX_H*wallPpm);
+ const patchW=floorPx+PAD*2,planeH=patchW;
+ const wallPatchW=wallPx+PAD*2,wallPatchH=wallHPx+PAD*2;
+ // Each of the 9 wall layers represents a real voxel-column position,
+ // not merely a face orientation. Four orientation charts per row.
+ const cellW=Math.max(patchW*2,wallPatchW*4),cellH=planeH+wallPatchH*WALL_SLICES;
+ return{quality,ppm,wallPpm,padding:PAD,roomMeters:ROOM,maxHeight:MAX_H,
+  tileMeters:TILE,wallSlices:WALL_SLICES,floorPx,wallPx,wallHPx,patchW,
+  planeH,wallPatchW,wallPatchH,cellW,cellH,
   width:nextPOT(cellW*4),height:nextPOT(cellH*4)};
 }
-// Face labels are physical outward normals, not camera-facing directions.
-// +Y: floor, -Y: roof, +/-X: east-west-facing stone, +/-Z: north-south.
 function face(normal){
  const nx=normal[0],ny=normal[1],nz=normal[2];
  if(Math.abs(ny)>=.50&&Math.abs(ny)>=Math.max(Math.abs(nx),Math.abs(nz))*.85)return ny>=0?0:1;
  if(Math.abs(nx)>Math.abs(nz))return nx>=0?2:3;
  return nz>=0?4:5;
 }
-function chart(layout,roomX,roomZ,side){
- const col=side%2,row=Math.floor(side/2);
- const x=roomX*layout.cellW+col*layout.patchW+layout.padding;
- const y=roomZ*layout.cellH+(row===0?0:row===1?layout.planeH:layout.planeH+layout.wallH)+layout.padding;
- const w=layout.floorPx,h=row===0?layout.floorPx:layout.wallPx;
- return{x,y,w,h,pad:layout.padding,side,roomX,roomZ};
+function sliceAt(layout,p,side){
+ if(side<2)return 0;
+ const value=side<4?p[0]:p[2];
+ // A +normal face belongs to the solid voxel behind it. On a precise
+ // 1.8m boundary avoid assigning it to the neighbouring wall chart.
+ const epsilon=(side%2===0?-.005:.005);
+ const axis=Math.floor((value+epsilon)/layout.tileMeters);
+ return clamp(axis,0,layout.wallSlices-1);
+}
+function chart(layout,roomX,roomZ,side,slice=0){
+ const ox=roomX*layout.cellW,oy=roomZ*layout.cellH;
+ if(side<2)return{x:ox+(side===0?0:layout.patchW)+layout.padding,
+  y:oy+layout.padding,w:layout.floorPx,h:layout.floorPx,pad:layout.padding,
+  side,slice:0,roomX,roomZ};
+ const depth=clamp(Math.floor(slice),0,layout.wallSlices-1);
+ return{x:ox+(side-2)*layout.wallPatchW+layout.padding,
+  y:oy+layout.planeH+depth*layout.wallPatchH+layout.padding,
+  w:layout.wallPx,h:layout.wallHPx,pad:layout.padding,
+  side,slice:depth,roomX,roomZ};
 }
 function chartCoordinates(layout,position,normal){
  const roomX=clamp(Math.floor(position[0]/ROOM),0,3),roomZ=clamp(Math.floor(position[2]/ROOM),0,3);
- const side=face(normal),tile=chart(layout,roomX,roomZ,side);
- const rx=clamp(position[0]-roomX*ROOM,0,ROOM),rz=clamp(position[2]-roomZ*ROOM,0,ROOM);
- const u=side<=1?rx:side<=3?rz:rx;
- const v=side<=1?rz:clamp(position[1],0,MAX_H);
- const tx=tile.x+clamp(u*layout.ppm-.5,0,tile.w-1)+.5;
- const ty=tile.y+clamp(v*layout.ppm-.5,0,tile.h-1)+.5;
- return{u:tx/layout.width,v:ty/layout.height,texelX:tx,texelY:ty,roomX,roomZ,side};
+ const side=face(normal);
+ const local=[clamp(position[0]-roomX*ROOM,0,ROOM),position[1],
+  clamp(position[2]-roomZ*ROOM,0,ROOM)];
+ const slice=sliceAt(layout,local,side);
+ const tile=chart(layout,roomX,roomZ,side,slice);
+ const meters=side<2?[local[0],local[2]]:side<4?[local[2],local[1]]:[local[0],local[1]];
+ const density=side<2?layout.ppm:layout.wallPpm;
+ const tx=tile.x+clamp(meters[0]*density-.5,0,tile.w-1)+.5;
+ const ty=tile.y+clamp(meters[1]*density-.5,0,tile.h-1)+.5;
+ return{u:tx/layout.width,v:ty/layout.height,texelX:tx,texelY:ty,
+  roomX,roomZ,side,slice};
 }
 function diffuseUV(position,normal,metersPerRepeat=1.8){
  const p=position,n=normal,s=1/metersPerRepeat;
@@ -99,6 +120,6 @@ function unwrapMesh(T,geometry,{texelsPerMeter=8,padding=2,maxAtlas=2048}={}){
  g.userData.criptUV={texelsPerMeter,padding,atlasWidth:width,atlasHeight:height,charts:tris.length};
  return g;
 }
-root.CriptUV={layout,face,chart,chartCoordinates,diffuseUV,unwrapMesh,ppmFor};
+root.CriptUV={layout,face,chart,chartCoordinates,sliceAt,diffuseUV,unwrapMesh,ppmFor,wallPpmFor};
 if(root.Cript)root.Cript.UV=root.CriptUV;
 })(typeof self!=='undefined'?self:typeof window!=='undefined'?window:globalThis);
