@@ -237,7 +237,7 @@ function bakeSurface(input,onProgress=null){
    texelsPerMeter:L.ppm,wallTexelsPerMeter:L.wallPpm,atlasWidth:L.width,atlasHeight:L.height,charts:rooms.length*(2+4*L.wallSlices),padding:L.padding}};
 }
 
-if(typeof scope.importScripts==='function'&&!scope.CriptUV)scope.importScripts('uv-mapping.js?v=uv08');
+if(typeof scope.importScripts==='function'&&!scope.CriptUV)scope.importScripts('uv-mapping.js?v=uv09');
 scope.CriptGIWorker={bake,bakeSurface};
 if(typeof scope.postMessage==='function'&&typeof scope.importScripts==='function'){
  scope.onmessage=event=>{
