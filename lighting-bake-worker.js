@@ -107,7 +107,7 @@ function bake(input){
 }
 // Surface-chart bake: six directions per room, a physical texel density and
 // two-pixel guard bands. No trilinear mixing between unrelated height slices.
-function bakeSurface(input){
+function bakeSurface(input,onProgress=null){
  const U=scope.CriptUV;
  if(!U)throw Error('CRIPT UV charts not loaded');
  const L=input.layout||U.layout(input.quality||'medium');
@@ -159,6 +159,7 @@ function bakeSurface(input){
  const dirs=[[1,0],[-1,0],[0,1],[0,-1],[.707,.707],[-.707,.707],[.707,-.707],[-.707,-.707]];
  const contacts=[.32,.70,1.35],influence=[.14,.09,.045];
  let rays=0,count=0,minAO=1;
+ let finishedRooms=0;
  for(const room of rooms){
   const lights=sources.filter(l=>Math.hypot(l.x-(room.gx+.5)*L.roomMeters,l.z-(room.gz+.5)*L.roomMeters)<l.radius+11);
   for(let side=0;side<6;side++){
@@ -223,6 +224,13 @@ function bakeSurface(input){
    }
    }
   }
+  finishedRooms++;
+  // Update the first chamber immediately, then the remainder in small
+  // batches. The all-rooms bake can take several seconds on mobile CPUs.
+  if(onProgress&&(finishedRooms===1||finishedRooms%4===0)&&finishedRooms<rooms.length){
+   const partial=out.slice().buffer;
+   onProgress({buffer:partial,completedRooms:finishedRooms,totalRooms:rooms.length});
+  }
  }
  return{width:L.width,height:L.height,buffer:out.buffer,
   statistics:{lights:sources.length,samples:count,occlusions:rays,minAO,
@@ -235,7 +243,9 @@ if(typeof scope.postMessage==='function'&&typeof scope.importScripts==='function
  scope.onmessage=event=>{
   try{
    const {token,...args}=event.data;
-   const result=args.surfaceAtlas?bakeSurface(args):bake(args);
+   const result=args.surfaceAtlas?bakeSurface(args,progress=>{
+    scope.postMessage({token,partial:true,...progress},[progress.buffer]);
+   }):bake(args);
    scope.postMessage({token,result},[result.buffer]);
   }catch(error){scope.postMessage({token,error:String(error.stack||error)})}
  };
