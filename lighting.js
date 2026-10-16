@@ -11,7 +11,7 @@ if(!C||!T)return;
 // GLSL pieces MUST be joined with real newlines, not literal backslash-n,
 // otherwise the PBR material silently fails to compile on the GPU.
 const createSurfaceAtlasShader=L=>[
- 'vec4 criptSampleBakedLight(vec3 p,vec3 n,vec3 anchor){',
+ 'vec2 criptAtlasUV(vec3 p,vec3 n,vec3 anchor){',
  'vec2 room=floor(clamp(anchor.xz / 16.2,vec2(0.0),vec2(3.9999)));',
  'vec2 local=clamp(p.xz-room*16.2,vec2(0.0),vec2(16.2));',
  'vec3 faceAbs=abs(n);',
@@ -33,7 +33,10 @@ const createSurfaceAtlasShader=L=>[
  'vec2 extent=face<1.5?vec2('+(L.floorPx-1)+'.0):vec2('+(L.wallPx-1)+'.0,'+(L.wallHPx-1)+'.0);',
  'vec2 localMetric=vec2(localX,localY);',
  'vec2 uv=atlasOrigin+clamp(localMetric*density-.5,vec2(0.0),extent)+vec2(.5);',
- 'return texture2D(criptGIAtlas,uv/vec2('+L.width+'.0,'+L.height+'.0));',
+ 'return uv/vec2('+L.width+'.0,'+L.height+'.0);',
+ '}',
+ 'vec4 criptSampleBakedLight(vec3 p,vec3 n,vec3 anchor){',
+ 'return texture2D(criptGIAtlas,criptAtlasUV(p,n,anchor));',
  '}'
 ].join('\n');
 class BakedLighting{
@@ -135,6 +138,19 @@ class BakedLighting{
     '  float side=(a.y>=.5&&a.y>=max(a.x,a.z)*.85)?(n.y>=0.0?0.0:1.0):(a.x>a.z?(n.x>=0.0?2.0:3.0):(n.z>=0.0?4.0:5.0));',
     '  float layer=side<1.5?0.0:clamp(floor(((side<3.5?vCriptBakedWorld.x:vCriptBakedWorld.z)+.002)/1.8),0.0,8.0);',
     '  gl_FragColor.rgb=vec3(fract((side+1.0)*.36+.15),fract((layer+1.0)*.21+.12),fract((side+layer+1.0)*.17+.2));',
+    '}',
+    'if(criptDebugMode>3.5 && criptDebugMode<4.5){',
+    '#ifdef USE_MAP',
+    '  vec2 duv=fract(vMapUv);',
+    '  float edge=step(duv.x,.018)+step(duv.y,.018)+step(.982,duv.x)+step(.982,duv.y);',
+    '  gl_FragColor.rgb=mix(vec3(duv.x,duv.y,.5),vec3(.02,.02,.02),clamp(edge,0.0,1.0));',
+    '#else',
+    '  gl_FragColor.rgb=vec3(.4,.1,.1);',
+    '#endif',
+    '}',
+    'if(criptDebugMode>4.5){',
+    '  vec2 auv=criptAtlasUV(vCriptBakedWorld,normalize(vCriptWorldNormal),vCriptBakeAnchor);',
+    '  gl_FragColor.rgb=vec3(fract(auv.x*64.0),fract(auv.y*64.0),.33);',
     '}'
    ].join('\n'));
    // Height fog is part of the world material, not a full-screen blur pass.
@@ -150,7 +166,7 @@ class BakedLighting{
 
   };
   const oldKey=material.customProgramCacheKey?.bind(material);
-  material.customProgramCacheKey=()=>String(oldKey?oldKey():'')+'|cript-surface-gi-v9-' + this.layout.ppm+'-'+this.layout.wallPpm;
+  material.customProgramCacheKey=()=>String(oldKey?oldKey():'')+'|cript-surface-gi-v9b-' + this.layout.ppm+'-'+this.layout.wallPpm;
   material.needsUpdate=true;this.materials.push(material);
  }
  sources(){
@@ -312,7 +328,7 @@ class BakedLighting{
    else runWorker();
   }).catch(runWorker);
  }
- setDebugMode(mode=0){this.debugUniform.value=Math.max(0,Math.min(3,Math.round(mode)))}
+ setDebugMode(mode=0){this.debugUniform.value=Math.max(0,Math.min(5,Math.round(mode)))}
  setFog(atmosphere){
   if(!atmosphere)return;
   this.fogColor.value.set(atmosphere.fog||'#284744');
