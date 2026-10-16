@@ -40,7 +40,7 @@ class BakedLighting{
   this.scene=scene;this.world=world;this.project=project;
   this.layout=C.UV.layout(project.editor?.quality||'medium');
   this.uniform={value:null};this.debugUniform={value:0};this.timeUniform={value:0};this.fogColor={value:new T.Color(0x2b504d)};this.fogDensity={value:.36};this.materials=[];this.moons=[];
-  this.worker=null;this.generation=0;this.timer=0;
+  this.worker=null;this.generation=0;this.timer=0;this.bakeProgress=null;this.lastBakeError=null;
   const init=new Uint8Array(this.layout.width*this.layout.height*4);
   for(let i=0;i<init.length;i+=4){init[i]=30;init[i+1]=36;init[i+2]=43;init[i+3]=235}
   this.texture=this.makeTexture(init);this.uniform.value=this.texture;
@@ -270,7 +270,27 @@ class BakedLighting{
      if(this.worker)this.worker.terminate();
      const worker=new Worker('lighting-bake-worker.js?v=uv08');
      this.worker=worker;
-     worker.onmessage=e=>{finish(e.data);worker.terminate();if(this.worker===worker)this.worker=null};
+     worker.onmessage=e=>{
+      const msg=e.data;
+      if(this.disposed||token!==this.generation)return;
+      if(msg.partial){
+       if(msg.buffer&&msg.buffer.byteLength===this.texture.image.data.byteLength){
+        this.texture.image.data.set(new Uint8Array(msg.buffer));
+        this.texture.needsUpdate=true;
+        this.bakeProgress={completed:msg.completedRooms,total:msg.totalRooms};
+       }
+       return;
+      }
+      if(msg.error){
+       this.lastBakeError=String(msg.error);
+       console.warn('CRIPT lightmap worker failed:',this.lastBakeError);
+       // Preserve the already-streamed atlas rather than discarding light.
+      }else{
+       this.bakeProgress=null;this.lastBakeError=null;
+       finish(msg);
+      }
+      worker.terminate();if(this.worker===worker)this.worker=null;
+     };
      worker.onerror=()=>{worker.terminate();if(this.worker===worker)this.worker=null;fallback()};
      worker.postMessage(payload);return;
     }catch(e){this.worker?.terminate();this.worker=null}
