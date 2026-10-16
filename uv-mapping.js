@@ -51,8 +51,9 @@ function chart(layout,roomX,roomZ,side,slice=0){
   side,slice:depth,roomX,roomZ};
 }
 function chartCoordinates(layout,position,normal){
- const roomX=clamp(Math.floor(position[0]/ROOM),0,3),roomZ=clamp(Math.floor(position[2]/ROOM),0,3);
  const side=face(normal);
+ const roomX=clamp(Math.floor((position[0]-Math.sign(normal[0])*.005)/ROOM),0,3),
+  roomZ=clamp(Math.floor((position[2]-Math.sign(normal[2])*.005)/ROOM),0,3);
  const local=[clamp(position[0]-roomX*ROOM,0,ROOM),position[1],
   clamp(position[2]-roomZ*ROOM,0,ROOM)];
  const slice=sliceAt(layout,local,side);
