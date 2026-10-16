@@ -109,6 +109,13 @@ assert.equal(C.game.lighting.debugUniform.value,1);
 C.game.lighting.setDebugMode(3);
 assert.equal(C.game.lighting.debugUniform.value,3,'Chart ID debug view must be selectable');
 assert.ok(shader.fragmentShader.includes('layer=side<1.5'),'Shader chart diagnostic must encode wall layer');
+C.game.lighting.setDebugMode(4);
+assert.equal(C.game.lighting.debugUniform.value,4,'Diffuse UV0 checker should be exposed');
+C.game.lighting.setDebugMode(5);
+assert.equal(C.game.lighting.debugUniform.value,5,'GI atlas UV checker should be exposed');
+assert.ok(shader.fragmentShader.includes('criptAtlasUV('),'GI shader must calculate actual atlas coordinates');
+assert.ok(shader.vertexShader.includes('vCriptBakeAnchor'),'GI shader must pass stable instance anchor');
+assert.ok(shader.fragmentShader.includes('localAnchor'),'GI atlas must choose tile from instance anchor, not surface face');
 C.game.lighting.setDebugMode(0);
 
 // Reject BOTH one and multiple literal backslashes followed by "n": this
