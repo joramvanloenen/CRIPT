@@ -123,6 +123,7 @@ renderInspector(){const a=this.asset(),body=$('inspectorBody');body.replaceChild
   this.button(body,'SHADED WORLD',()=>{C.game.lighting?.setDebugMode(0);C.notice('MATERIALS + AO + GI')});
   this.button(body,'AO ONLY',()=>{C.game.lighting?.setDebugMode(1);C.notice('AO WHITE = CLEAR / DARK = OCCLUDED')});
   this.button(body,'BAKED LIGHT ONLY',()=>{C.game.lighting?.setDebugMode(2);C.notice('INDIRECT + STATIC LIGHT ATLAS')});
+  this.button(body,'LIGHTMAP CHART IDS',()=>{C.game.lighting?.setDebugMode(3);C.notice('LIGHTMAP CHART IDs: SAME COLOR = SAME SAMPLE AREA')});
   const metrics=C.game.lighting?.stats;
   if(metrics)this.heading(body,'LIGHTMAP',metrics.samples+' GI/AO probes · '+metrics.lights+' light emitters · '+metrics.occlusions+' blocked rays');
  }
