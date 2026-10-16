@@ -8,6 +8,8 @@ if(!C||!T)return;
 // A dedicated lightmap-coordinate varying is calculated independently from
 // diffuse UV0. UV2 is intentionally NOT sampled by this instanced GI renderer:
 // shared mesh UV2 has no way to identify which room / world tile is rendered.
+// GLSL pieces MUST be joined with real newlines, not literal backslash-n,
+// otherwise the PBR material silently fails to compile on the GPU.
 const createSurfaceAtlasShader=L=>[
  'vec4 criptSampleBakedLight(vec3 p,vec3 n){',
  'vec2 room=floor(clamp((p.xz-sign(n.xz)*.005) / 16.2,vec2(0.0),vec2(3.9999)));',
@@ -32,7 +34,7 @@ const createSurfaceAtlasShader=L=>[
  'vec2 uv=atlasOrigin+clamp(localMetric*density-.5,vec2(0.0),extent)+vec2(.5);',
  'return texture2D(criptGIAtlas,uv/vec2('+L.width+'.0,'+L.height+'.0));',
  '}'
-].join('\\n');
+].join('\n');
 class BakedLighting{
  constructor(scene,world,project){
   this.scene=scene;this.world=world;this.project=project;
@@ -141,7 +143,7 @@ class BakedLighting{
 
   };
   const oldKey=material.customProgramCacheKey?.bind(material);
-  material.customProgramCacheKey=()=>String(oldKey?oldKey():'')+'|cript-surface-gi-v7-' + this.layout.ppm+'-'+this.layout.wallPpm;
+  material.customProgramCacheKey=()=>String(oldKey?oldKey():'')+'|cript-surface-gi-v8-' + this.layout.ppm+'-'+this.layout.wallPpm;
   material.needsUpdate=true;this.materials.push(material);
  }
  sources(){
@@ -198,7 +200,7 @@ class BakedLighting{
  }
  cacheKey(payload){
   const signature=JSON.stringify({rooms:payload.rooms,sources:payload.sources,
-    nx:payload.nx,nz:payload.nz,ny:payload.ny,ver:'depth-sliced-charts-uv7-vault',layout:payload.layout});
+    nx:payload.nx,nz:payload.nz,ny:payload.ny,ver:'uv8-glsl-recovery',layout:payload.layout});
   let hash=2166136261;
   for(let i=0;i<signature.length;i++){
    hash^=signature.charCodeAt(i);hash=Math.imul(hash,16777619);
@@ -266,7 +268,7 @@ class BakedLighting{
    if(typeof Worker!=='undefined'&&(typeof location==='undefined'||location.protocol!=='file:')){
     try{
      if(this.worker)this.worker.terminate();
-     const worker=new Worker('lighting-bake-worker.js?v=uv07');
+     const worker=new Worker('lighting-bake-worker.js?v=uv08');
      this.worker=worker;
      worker.onmessage=e=>{finish(e.data);worker.terminate();if(this.worker===worker)this.worker=null};
      worker.onerror=()=>{worker.terminate();if(this.worker===worker)this.worker=null;fallback()};
