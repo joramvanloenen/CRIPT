@@ -291,7 +291,7 @@ class BakedLighting{
    if(typeof Worker!=='undefined'&&(typeof location==='undefined'||location.protocol!=='file:')){
     try{
      if(this.worker)this.worker.terminate();
-     const worker=new Worker('lighting-bake-worker.js?v=uv08');
+     const worker=new Worker('lighting-bake-worker.js?v=uv09');
      this.worker=worker;
      worker.onmessage=e=>{
       const msg=e.data;
