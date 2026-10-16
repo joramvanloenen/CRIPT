@@ -89,9 +89,11 @@ assert.ok(shader.vertexShader.includes('instanceMatrix'),'Instanced geometry mus
 assert.ok(shader.vertexShader.includes('vMapUv=criptUV'),'Diffuse maps must use physical world-space UV0');
 assert.ok(shader.vertexShader.includes('vNormalMapUv=criptUV'),'Normal maps must use the same physical texel density');
 assert.ok(shader.vertexShader.includes('vRoughnessMapUv=criptUV'),'Roughness must share correct UV0 scale');
-assert.ok(shader.fragmentShader.includes('chartOrigin'),'Lightmap must address directional charts with padding');
+assert.ok(shader.fragmentShader.includes('depthLayer'),'Lightmap must address physical wall-depth charts');
 assert.equal(C.game.lighting.layout.ppm,C.UV.layout(C.project.editor?.quality).ppm);
 assert.equal(C.game.lighting.layout.padding,2);
+assert.equal(C.game.lighting.layout.wallSlices,9);
+assert.ok(shader.vertexShader.includes('dot(criptS0,criptS0)'),'Normals on scaled instance meshes must be inverse-transposed');
 assert.equal(C.game.lighting.texture.image?.width||C.game.lighting.layout.width,C.game.lighting.layout.width);
 
 assert.ok(shader.fragmentShader.includes('criptSampleBakedLight'),'Indirect GI shader sample missing');
