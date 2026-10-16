@@ -11,8 +11,8 @@ if(!C||!T)return;
 // GLSL pieces MUST be joined with real newlines, not literal backslash-n,
 // otherwise the PBR material silently fails to compile on the GPU.
 const createSurfaceAtlasShader=L=>[
- 'vec4 criptSampleBakedLight(vec3 p,vec3 n){',
- 'vec2 room=floor(clamp((p.xz-sign(n.xz)*.005) / 16.2,vec2(0.0),vec2(3.9999)));',
+ 'vec4 criptSampleBakedLight(vec3 p,vec3 n,vec3 anchor){',
+ 'vec2 room=floor(clamp(anchor.xz / 16.2,vec2(0.0),vec2(3.9999)));',
  'vec2 local=clamp(p.xz-room*16.2,vec2(0.0),vec2(16.2));',
  'vec3 faceAbs=abs(n);',
  'float face=0.0;',
@@ -20,7 +20,8 @@ const createSurfaceAtlasShader=L=>[
  'else if(faceAbs.x>faceAbs.z)face=n.x>=0.0?2.0:3.0;',
  'else face=n.z>=0.0?4.0:5.0;',
  'float density=face<1.5?'+L.ppm+'.0:'+L.wallPpm+'.0;',
- 'float depthCoord=face<3.5?local.x:local.y;',
+ 'vec2 localAnchor=clamp(anchor.xz-room*16.2,vec2(0.0),vec2(16.2));',
+ 'float depthCoord=face<3.5?localAnchor.x:localAnchor.y;',
  'float depthBias=mod(face,2.0)<.5?-.005:.005;',
  'float depthLayer=clamp(floor((depthCoord+depthBias)/'+L.tileMeters+'),0.0,'+(L.wallSlices-1)+'.0);',
  'float localX=face<1.5?local.x:(face<3.5?local.y:local.x);',
@@ -62,7 +63,7 @@ class BakedLighting{
    shader.uniforms.criptDebugMode=debug;
    shader.uniforms.criptHeightFogColor=fogColor;
    shader.uniforms.criptHeightFogDensity=fogDensity;
-   shader.vertexShader='varying vec3 vCriptBakedWorld;\nvarying vec3 vCriptWorldNormal;\n'+shader.vertexShader;
+   shader.vertexShader='varying vec3 vCriptBakeAnchor;\n'+'varying vec3 vCriptBakedWorld;\nvarying vec3 vCriptWorldNormal;\n'+shader.vertexShader;
    shader.vertexShader=shader.vertexShader.replace('#include <project_vertex>',[
     '#include <project_vertex>',
     'vec4 criptProbePoint=vec4(transformed,1.0);',
@@ -70,6 +71,11 @@ class BakedLighting{
     '  criptProbePoint=instanceMatrix*criptProbePoint;',
     '#endif',
     'vCriptBakedWorld=(modelMatrix*criptProbePoint).xyz;',
+    'vec4 criptAnchor=vec4(0.0,0.0,0.0,1.0);',
+    '#ifdef USE_INSTANCING',
+    '  criptAnchor=instanceMatrix*criptAnchor;',
+    '#endif',
+    'vCriptBakeAnchor=(modelMatrix*criptAnchor).xyz;',
     'vec3 criptFaceNormal=normal;',
     '#ifdef USE_INSTANCING',
     '  vec3 criptS0=instanceMatrix[0].xyz;',
@@ -100,6 +106,7 @@ class BakedLighting{
     '#endif'
    ].join('\n'));
    shader.fragmentShader=[
+    'varying vec3 vCriptBakeAnchor;',
     'varying vec3 vCriptBakedWorld;',
     'varying vec3 vCriptWorldNormal;',
     'uniform sampler2D criptGIAtlas;',
@@ -110,7 +117,7 @@ class BakedLighting{
    ].join('\n')+'\n'+shader.fragmentShader;
    shader.fragmentShader=shader.fragmentShader.replace('#include <lights_fragment_maps>',[
     '#include <lights_fragment_maps>',
-    'vec4 criptBake=criptSampleBakedLight(vCriptBakedWorld,normalize(vCriptWorldNormal));',
+    'vec4 criptBake=criptSampleBakedLight(vCriptBakedWorld,normalize(vCriptWorldNormal),vCriptBakeAnchor);',
     'reflectedLight.indirectDiffuse*=mix(1.0,criptBake.a,.28);',
     'reflectedLight.indirectDiffuse+=criptBake.rgb*diffuseColor.rgb*1.60;'
    ].join('\n'));
@@ -143,7 +150,7 @@ class BakedLighting{
 
   };
   const oldKey=material.customProgramCacheKey?.bind(material);
-  material.customProgramCacheKey=()=>String(oldKey?oldKey():'')+'|cript-surface-gi-v8-' + this.layout.ppm+'-'+this.layout.wallPpm;
+  material.customProgramCacheKey=()=>String(oldKey?oldKey():'')+'|cript-surface-gi-v9-' + this.layout.ppm+'-'+this.layout.wallPpm;
   material.needsUpdate=true;this.materials.push(material);
  }
  sources(){
@@ -200,7 +207,7 @@ class BakedLighting{
  }
  cacheKey(payload){
   const signature=JSON.stringify({rooms:payload.rooms,sources:payload.sources,
-    nx:payload.nx,nz:payload.nz,ny:payload.ny,ver:'uv8-glsl-recovery',layout:payload.layout});
+    nx:payload.nx,nz:payload.nz,ny:payload.ny,ver:'uv9-anchored-wall-uv',layout:payload.layout});
   let hash=2166136261;
   for(let i=0;i<signature.length;i++){
    hash^=signature.charCodeAt(i);hash=Math.imul(hash,16777619);
