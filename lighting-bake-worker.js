@@ -137,7 +137,17 @@ function bakeSurface(input){
   const density=side<2?L.ppm:L.wallPpm;
   const u=Math.min(L.roomMeters,(tx+.5)/density),v=Math.min(L.maxHeight,(ty+.5)/density);
   if(side===0)return[[x0+u,.055,z0+v],[0,1,0]];
-  if(side===1)return[[x0+u,r.height-.12,z0+v],[0,-1,0]];
+  if(side===1){
+   if(!r.vault||r.vault==='flat')return[[x0+u,r.height-.12,z0+v],[0,-1,0]];
+   // Follow the elliptical barrel vault instead of sampling a flat roof.
+   const half=6.1,rise=r.vault==='ribbed'?2.65:1.85;
+   const dx=clamp(u-L.roomMeters*.5,-half+.15,half-.15);
+   const root=Math.sqrt(Math.max(.002,1-(dx/half)*(dx/half)));
+   const y=r.height-rise+rise*root-.11;
+   const slope=-rise*dx/(half*half*root);
+   const inv=1/Math.hypot(slope,1);
+   return[[x0+u,y,z0+v],[slope*inv,-inv,0]];
+  }
   // Every chart must bake the SAME physical tile surface that the renderer
   // addresses. No longer project every east-facing wall onto a single
   // guessed wall near the middle of its room.
