@@ -106,6 +106,9 @@ assert.ok(C.game.architecture.mats.get('ivory').normalMap,'Carved capitals must 
 assert.ok(C.game.architecture.mats.get('soot').roughnessMap,'Weathered decorative blocks need roughness');
 C.game.lighting.setDebugMode(1);
 assert.equal(C.game.lighting.debugUniform.value,1);
+C.game.lighting.setDebugMode(3);
+assert.equal(C.game.lighting.debugUniform.value,3,'Chart ID debug view must be selectable');
+assert.ok(shader.fragmentShader.includes('layer=side<1.5'),'Shader chart diagnostic must encode wall layer');
 C.game.lighting.setDebugMode(0);
 
 assert.ok(!shader.fragmentShader.includes('\\\\n'),'Shader source must contain real GLSL newline characters');
@@ -215,7 +218,7 @@ assert.equal(game.room.id,'room-5');
 assert.ok(game.seen.has('room-5'),'Visiting the hidden room should reveal it');
 
 const html=fs.readFileSync('index.html','utf8'),css=fs.readFileSync('style.css','utf8');
-assert.ok(html.indexOf('src="weapons.js?v=pixel08"')<html.indexOf('src="game.js?v=pixel08"'),'Weapon rig must load before engine');
+assert.ok(html.indexOf('src="weapons.js?v=uv07"')<html.indexOf('src="game.js?v=uv07"'),'Weapon rig must load before engine');
 for(const key of ['q','e','w','a','s','d','f','attack','dodge','spell']){
  const m=html.match(new RegExp('<button[^>]*data-touch="'+key+'"[^>]*>([\\s\\S]*?)<\\/button>'));
  assert.ok(m&&m[1].includes('<svg'),'Touch button '+key+' must use a vector icon');
