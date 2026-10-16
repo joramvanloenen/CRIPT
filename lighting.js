@@ -10,7 +10,7 @@ if(!C||!T)return;
 // shared mesh UV2 has no way to identify which room / world tile is rendered.
 const createSurfaceAtlasShader=L=>[
  'vec4 criptSampleBakedLight(vec3 p,vec3 n){',
- 'vec2 room=floor(clamp(p.xz / 16.2,vec2(0.0),vec2(3.9999)));',
+ 'vec2 room=floor(clamp((p.xz-sign(n.xz)*.005) / 16.2,vec2(0.0),vec2(3.9999)));',
  'vec2 local=clamp(p.xz-room*16.2,vec2(0.0),vec2(16.2));',
  'vec3 faceAbs=abs(n);',
  'float face=0.0;',
