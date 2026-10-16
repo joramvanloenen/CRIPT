@@ -114,6 +114,7 @@ assert.equal(C.game.lighting.debugUniform.value,4,'Diffuse UV0 checker should be
 C.game.lighting.setDebugMode(5);
 assert.equal(C.game.lighting.debugUniform.value,5,'GI atlas UV checker should be exposed');
 assert.ok(shader.fragmentShader.includes('criptAtlasUV('),'GI shader must calculate actual atlas coordinates');
+assert.ok(shader.fragmentShader.includes('vec2 criptAtlasUV(vec3 p,vec3 n,vec3 anchor){\n'),'Shader must separate UV function with real GLSL newlines');
 assert.ok(shader.vertexShader.includes('vCriptBakeAnchor'),'GI shader must pass stable instance anchor');
 assert.ok(shader.fragmentShader.includes('localAnchor'),'GI atlas must choose tile from instance anchor, not surface face');
 C.game.lighting.setDebugMode(0);
@@ -125,7 +126,7 @@ assert.ok(!shader.fragmentShader.includes(String.fromCharCode(92,110)),
 assert.ok(shader.fragmentShader.includes('}\nvoid main()')||
  shader.fragmentShader.includes('}\n'+ 'void main()'),
  'Lightmap sampling function must end before the fragment main()');
-assert.ok(shader.fragmentShader.includes('vec4 criptSampleBakedLight(vec3 p,vec3 n){\n'),
+assert.ok(shader.fragmentShader.includes('vec4 criptSampleBakedLight(vec3 p,vec3 n,vec3 anchor){\n'),
  'Lightmap shader helper lines must be separated with actual newlines');
 assert.ok(shader.uniforms.criptGIAtlas===C.game.lighting.uniform,'Shared GI atlas must be shader-bound');
 
